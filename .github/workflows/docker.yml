@@ -1,0 +1,74 @@
+name: Docker
+
+on:
+  push:
+    branches: [main]
+    tags: ['v*']
+  pull_request:
+    branches: [main]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  packages: write
+
+jobs:
+  syntax-check:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: node --check every source file
+        run: |
+          set -e
+          for f in $(find src public -name '*.js'); do
+            echo "checking $f"
+            node --check "$f"
+          done
+
+  build-and-push:
+    needs: syntax-check
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: docker/setup-buildx-action@v3
+
+      # Skipped for pull_request: a PR from a fork gets a read-only
+      # GITHUB_TOKEN with no packages:write scope, so login would fail.
+      # It's also unnecessary — PR runs never push (see the push: line
+      # below), they only build to prove the Dockerfile still works.
+      - if: github.event_name != 'pull_request'
+        uses: docker/login-action@v3
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      # GHCR image names must be lowercase; the repository name may not be
+      # (e.g. "PB-1"), so lowercase it explicitly.
+      - name: Lowercase image name
+        run: echo "IMAGE=ghcr.io/${GITHUB_REPOSITORY,,}" >> "$GITHUB_ENV"
+
+      - id: meta
+        uses: docker/metadata-action@v5
+        with:
+          images: ${{ env.IMAGE }}
+          tags: |
+            type=ref,event=branch
+            type=semver,pattern={{version}}
+            type=semver,pattern={{major}}.{{minor}}
+            type=raw,value=latest,enable={{is_default_branch}}
+
+      # TrueNAS SCALE is x86-64 only, so this only builds linux/amd64 (no
+      # QEMU cross-build). If you later need to run this on arm64 hardware
+      # (e.g. a Raspberry Pi), add "linux/arm64" back to platforms and
+      # restore a docker/setup-qemu-action@v3 step before this one.
+      - uses: docker/build-push-action@v6
+        with:
+          context: .
+          platforms: linux/amd64
+          push: ${{ github.event_name != 'pull_request' }}
+          tags: ${{ steps.meta.outputs.tags }}
+          labels: ${{ steps.meta.outputs.labels }}
+          cache-from: type=gha
+          cache-to: type=gha,mode=max

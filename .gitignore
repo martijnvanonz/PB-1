@@ -1,0 +1,4 @@
+data/
+.env
+.impeccable/
+.DS_Store

@@ -1,0 +1,43 @@
+services:
+  patchbay:
+    # Published by .github/workflows/docker.yml on every push to main, as
+    # ghcr.io/<owner>/<repo> lowercased (GHCR rejects uppercase). If you
+    # fork, change this to your own path or the pull 404s.
+    image: ghcr.io/martijnvanonz/pb-1:latest
+    # Explicit and matched to the "chown 1000:1000" below: the image's node
+    # user is uid:gid 1000:1000 (set by the Dockerfile's USER node), and
+    # this line pins the container to that same uid so the two never drift
+    # apart even if the base image changes later.
+    user: "1000:1000"
+    ports:
+      - "8288:8288"
+    volumes:
+      # REQUIRED ONE-TIME SETUP before your first `docker compose up`, in
+      # an empty directory:
+      #   mkdir -p ./data && chown 1000:1000 ./data
+      #
+      # Why: this is a bind mount, not a named volume, so your data stays a
+      # normal folder you can see, browse, and back up with your usual
+      # TrueNAS dataset snapshots. The cost is that Docker does NOT chown a
+      # bind-mount source for you — if ./data doesn't exist yet, Docker
+      # creates it as root:root, and the container (running as uid 1000)
+      # then gets "permission denied" writing into it and crash-loops. The
+      # command above avoids that entirely. If you forget it, the app now
+      # prints a clear error naming the exact fix instead of a stack trace
+      # — check `docker compose logs`.
+      - ./data:/data
+    environment:
+      PORT: "8288"
+      DATA_DIR: /data
+      # Optional. See README "Private-resource icon discovery" for when
+      # this is needed under bridge networking.
+      # INTERNAL_HOST: 192.0.2.10
+    restart: unless-stopped
+    # Alternative to setting INTERNAL_HOST: run this container on the
+    # host's own network namespace instead of Docker's bridge, so
+    # 127.0.0.1 (how Pangolin reports a host-networked Newt's destinations)
+    # already resolves correctly without any rewriting. Uncomment this AND
+    # remove the "ports" mapping above (host networking ignores it and the
+    # container just binds PORT directly on the host). Pick this or
+    # INTERNAL_HOST, not both.
+    # network_mode: host

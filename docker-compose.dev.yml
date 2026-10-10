@@ -1,0 +1,14 @@
+services:
+  homelab-dashboard:
+    build: .
+    image: homelab-dashboard:dev
+    # Host port 8299, not 8288: 8288 is the live dashboard's port and must
+    # never be taken by a dev/test container.
+    ports:
+      - "8299:8288"
+    volumes:
+      - ./data:/data
+    environment:
+      PORT: "8288"
+      DATA_DIR: /data
+    restart: unless-stopped

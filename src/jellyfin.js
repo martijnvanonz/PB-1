@@ -1,0 +1,460 @@
+// Jellyfin active-sessions widget data. Zero dependencies.
+//
+// Credentials are read from src/settings.js on every call — never cached
+// at module load — so a settings change takes effect on the next call.
+
+const settings = require('./settings');
+
+const CACHE_MS = 30 * 1000;
+
+// Now-playing is live playback state (position, pause flag). A stale value
+// here reads as wrong (a paused stream shown as playing), so this cache is
+// much shorter than the others.
+const NOWPLAYING_CACHE_MS = 5 * 1000;
+
+// Jellyfin RunTimeTicks are 100-nanosecond units. 1 minute = 60s * 1e7
+// ticks/second = 600,000,000 ticks.
+const TICKS_PER_MINUTE = 600000000;
+
+// --- BlurHash -> band colour --------------------------------------------
+//
+// We only ever need the DC (average colour) component, decoded server-side
+// from the BlurHash Jellyfin already returns in ImageBlurHashes — no image
+// fetch, no canvas. The base83 alphabet used by BlurHash starts with the
+// digits, NOT 'A' — getting this wrong makes every decode silently wrong
+// while still looking plausible, so it is written out in full here rather
+// than derived.
+const BLURHASH_ALPHABET =
+  '0123456789ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz#$%*+,-.:;=?@[]^_{|}~';
+
+function decode83(str) {
+  let value = 0;
+  for (let i = 0; i < str.length; i++) {
+    const digit = BLURHASH_ALPHABET.indexOf(str[i]);
+    if (digit === -1) return null;
+    value = value * 83 + digit;
+  }
+  return value;
+}
+
+// Decodes only the DC (average colour) component of a BlurHash, validating
+// the header against the string length first. Returns {r,g,b} sRGB bytes,
+// or null if the hash is malformed/unusable — callers must fall back to a
+// neutral grey rather than trust a partially-decoded value.
+function averageColorFromBlurHash(hash) {
+  if (typeof hash !== 'string' || hash.length < 6) return null;
+  const sizeFlag = decode83(hash[0]);
+  if (sizeFlag === null) return null;
+  const numY = Math.floor(sizeFlag / 9) + 1;
+  const numX = (sizeFlag % 9) + 1;
+  const expectedLength = 4 + 2 * numX * numY;
+  if (hash.length !== expectedLength) return null;
+  const dc = decode83(hash.slice(2, 6));
+  if (dc === null || dc > 0xffffff) return null;
+  return { r: (dc >> 16) & 255, g: (dc >> 8) & 255, b: dc & 255 };
+}
+
+function rgbToHsl(r, g, b) {
+  r /= 255;
+  g /= 255;
+  b /= 255;
+  const max = Math.max(r, g, b);
+  const min = Math.min(r, g, b);
+  const l = (max + min) / 2;
+  if (max === min) return { h: 0, s: 0, l };
+  const d = max - min;
+  const s = l > 0.5 ? d / (2 - max - min) : d / (max + min);
+  let h;
+  switch (max) {
+    case r:
+      h = (g - b) / d + (g < b ? 6 : 0);
+      break;
+    case g:
+      h = (b - r) / d + 2;
+      break;
+    default:
+      h = (r - g) / d + 4;
+  }
+  h *= 60;
+  return { h, s, l };
+}
+
+function hslToRgb(h, s, l) {
+  h = ((h % 360) + 360) % 360;
+  const c = (1 - Math.abs(2 * l - 1)) * s;
+  const x = c * (1 - Math.abs(((h / 60) % 2) - 1));
+  const m = l - c / 2;
+  let r1, g1, b1;
+  if (h < 60) [r1, g1, b1] = [c, x, 0];
+  else if (h < 120) [r1, g1, b1] = [x, c, 0];
+  else if (h < 180) [r1, g1, b1] = [0, c, x];
+  else if (h < 240) [r1, g1, b1] = [0, x, c];
+  else if (h < 300) [r1, g1, b1] = [x, 0, c];
+  else [r1, g1, b1] = [c, 0, x];
+  return {
+    r: Math.round((r1 + m) * 255),
+    g: Math.round((g1 + m) * 255),
+    b: Math.round((b1 + m) * 255),
+  };
+}
+
+function srgbToLinear(c) {
+  const cs = c / 255;
+  return cs <= 0.04045 ? cs / 12.92 : Math.pow((cs + 0.055) / 1.055, 2.4);
+}
+
+function relativeLuminance(r, g, b) {
+  return 0.2126 * srgbToLinear(r) + 0.7152 * srgbToLinear(g) + 0.0722 * srgbToLinear(b);
+}
+
+// Jellyfin's ImageBlurHashes is keyed by image type, then by image tag:
+// { Primary: { "<tag>": "hash" }, Backdrop: { ... }, ... }. Prefer
+// Primary, then Thumb, then Backdrop.
+function pickBlurHash(item) {
+  const bh = item && item.ImageBlurHashes;
+  if (!bh || typeof bh !== 'object') return null;
+  for (const key of ['Primary', 'Thumb', 'Backdrop']) {
+    const map = bh[key];
+    if (map && typeof map === 'object') {
+      const hash = Object.values(map)[0];
+      if (typeof hash === 'string' && hash) return hash;
+    }
+  }
+  return null;
+}
+
+// Turns a BlurHash into a settled colour band: same hue as the artwork's
+// average colour, saturation boosted (raw poster averages are mud) and
+// clamped, lightness fixed at 47% for every tape so the set reads as a
+// boxed set. A malformed/unusable hash falls back to neutral grey (0%
+// saturation) rather than emitting a wrong colour. bandTextColor is
+// whichever of white/black gives more contrast against the resulting band.
+function bandColorFromBlurHash(hash) {
+  const avg = averageColorFromBlurHash(hash);
+  let hue = 0;
+  let satFraction = 0;
+  if (avg) {
+    const hsl = rgbToHsl(avg.r, avg.g, avg.b);
+    hue = Math.round(hsl.h);
+    satFraction = Math.min(0.82, Math.max(0.46, hsl.s * 1.9));
+  }
+  const satPct = Math.round(satFraction * 100);
+  const bandColor = `hsl(${hue} ${satPct}% 47%)`;
+  const rgb = hslToRgb(hue, satFraction, 0.47);
+  const l = relativeLuminance(rgb.r, rgb.g, rgb.b);
+  const contrastWhite = 1.05 / (l + 0.05);
+  const contrastBlack = (l + 0.05) / 0.05;
+  const bandTextColor = contrastWhite >= contrastBlack ? '#FFFFFF' : '#141414';
+  return { bandColor, bandTextColor };
+}
+
+let cache = { at: 0, data: null };
+let resumeCache = { at: 0, data: null };
+let nextUpCache = { at: 0, data: null };
+let nowPlayingCache = { at: 0, data: null };
+
+// The server's own internal id, needed to build a deep link into a
+// specific item. Rarely if ever changes, so it is cached once per
+// urlBase — re-fetched only if the configured Jellyfin URL changes.
+let serverIdCache = { url: null, id: null };
+
+// Discards every in-memory cache (sessions, resume list, server id). Call
+// after a successful settings save so the very next request re-reads
+// under the new URL/key/user instead of serving a result computed under
+// the old ones — e.g. switching the selected Jellyfin user must not keep
+// showing the previous user's resume list for up to 30 more seconds.
+function invalidate() {
+  cache = { at: 0, data: null };
+  resumeCache = { at: 0, data: null };
+  nextUpCache = { at: 0, data: null };
+  nowPlayingCache = { at: 0, data: null };
+  serverIdCache = { url: null, id: null };
+}
+
+// Node's fetch (undici) throws a bare, generic "fetch failed" (or a
+// timeout/abort) with no indication of what host it tried to reach. Turn
+// that into something the user can act on, naming only the origin —
+// never the full URL (which could carry a query string) and never the
+// API key.
+function isNetworkFailure(e) {
+  return Boolean(e) && (e instanceof TypeError || e.name === 'TimeoutError' || e.name === 'AbortError');
+}
+
+function describeFetchFailure(e, urlBase) {
+  if (!isNetworkFailure(e)) return e;
+  let origin = urlBase;
+  try {
+    origin = new URL(urlBase).origin;
+  } catch {
+    /* urlBase already has no query string; use it as-is */
+  }
+  return new Error(`Cannot reach Jellyfin at ${origin}`);
+}
+
+async function getServerId(urlBase, apiKey) {
+  if (serverIdCache.url === urlBase && serverIdCache.id) return serverIdCache.id;
+  const res = await fetch(`${urlBase}/System/Info`, {
+    headers: { Authorization: `MediaBrowser Token="${apiKey}"` },
+    signal: AbortSignal.timeout(5000),
+  });
+  if (!res.ok) throw new Error(`${res.status} ${res.statusText}`);
+  const info = await res.json();
+  serverIdCache = { url: urlBase, id: info.Id };
+  return info.Id;
+}
+
+async function configured() {
+  const s = await settings.load();
+  return Boolean(s.jellyfin.url && s.jellyfin.apiKey);
+}
+
+async function getSessions(force = false) {
+  const s = await settings.load();
+  const urlBase = (s.jellyfin.url || '').replace(/\/+$/, '');
+  const apiKey = s.jellyfin.apiKey || '';
+  if (!urlBase || !apiKey) return null;
+  const now = Date.now();
+  if (!force && cache.data && now - cache.at < CACHE_MS) return cache.data;
+  try {
+    const res = await fetch(`${urlBase}/Sessions`, {
+      headers: { Authorization: `MediaBrowser Token="${apiKey}"` },
+      signal: AbortSignal.timeout(5000),
+    });
+    if (!res.ok) throw new Error(`${res.status} ${res.statusText}`);
+    const sessions = await res.json();
+    const playing = sessions.filter((s) => s.NowPlayingItem);
+    const data = {
+      activeCount: playing.length,
+      sessions: playing.map((s) => ({
+        userName: s.UserName || 'Unknown',
+        itemName: s.NowPlayingItem.Name || 'Unknown',
+      })),
+      fetchedAt: new Date().toISOString(),
+      error: null,
+    };
+    cache = { at: now, data };
+    return data;
+  } catch (e) {
+    const data = { activeCount: 0, sessions: [], fetchedAt: null, error: describeFetchFailure(e, urlBase).message };
+    cache = { at: now, data };
+    return data;
+  }
+}
+
+// Shared item formatter for the resume, next-up, AND now-playing widgets,
+// so the frontend never needs any Jellyfin-specific logic. An Episode is
+// shown under its series name with an "SxEy · Episode Name" subtitle;
+// anything else (a Film, etc.) is shown under its own name with an empty
+// subtitle — never "SundefinedEundefined".
+//
+// `livePositionTicks` is the one now-playing-only extra: when given (a
+// number), progress/leftMin are computed from it instead of from
+// UserData, since a live session's position lives on PlayState, not on
+// the item's UserData. Resume/next-up pass nothing and get the old
+// UserData-based behaviour unchanged.
+function formatJellyfinItem(it, urlBase, serverId, withProgress, livePositionTicks) {
+  const isEpisode = it.Type === 'Episode';
+  const title = isEpisode ? it.SeriesName || it.Name || 'Unknown' : it.Name || 'Unknown';
+  let subtitle = '';
+  if (isEpisode) {
+    const season = it.ParentIndexNumber;
+    const episode = it.IndexNumber;
+    const seasonEpisode = season != null && episode != null ? `S${season}E${episode}` : '';
+    const epName = it.Name || '';
+    subtitle = seasonEpisode && epName ? `${seasonEpisode} · ${epName}` : seasonEpisode || epName;
+  }
+  const url = `${urlBase}/web/#/details?id=${encodeURIComponent(it.Id)}&serverId=${encodeURIComponent(serverId)}`;
+
+  const runMin = typeof it.RunTimeTicks === 'number' ? Math.round(it.RunTimeTicks / TICKS_PER_MINUTE) : null;
+  let progress = null;
+  let leftMin = null;
+  if (withProgress && typeof livePositionTicks === 'number' && typeof it.RunTimeTicks === 'number') {
+    // Live session: position comes from PlayState.PositionTicks, polled
+    // fresh every call — never fabricate a 0 leftMin, clamp instead.
+    progress = it.RunTimeTicks > 0 ? Math.round((livePositionTicks / it.RunTimeTicks) * 100) : null;
+    leftMin = Math.max(0, Math.round((it.RunTimeTicks - livePositionTicks) / TICKS_PER_MINUTE));
+  } else if (withProgress && it.UserData && typeof it.UserData.PlayedPercentage === 'number') {
+    progress = Math.round(it.UserData.PlayedPercentage);
+    if (typeof it.RunTimeTicks === 'number' && typeof it.UserData.PlaybackPositionTicks === 'number') {
+      leftMin = Math.max(0, Math.round((it.RunTimeTicks - it.UserData.PlaybackPositionTicks) / TICKS_PER_MINUTE));
+    }
+  }
+
+  const posterId = isEpisode ? it.SeriesId || it.Id : it.Id;
+  const posterUrl = `${urlBase}/Items/${encodeURIComponent(posterId)}/Images/Primary?maxWidth=200`;
+  const logoUrl = it.ParentLogoItemId
+    ? `${urlBase}/Items/${encodeURIComponent(it.ParentLogoItemId)}/Images/Logo?maxWidth=260`
+    : null;
+
+  const { bandColor, bandTextColor } = bandColorFromBlurHash(pickBlurHash(it));
+
+  return {
+    id: it.Id,
+    title,
+    subtitle,
+    series: title,
+    season: isEpisode && it.ParentIndexNumber != null ? it.ParentIndexNumber : null,
+    episode: isEpisode && it.IndexNumber != null ? it.IndexNumber : null,
+    episodeName: isEpisode ? it.Name || '' : '',
+    progress,
+    runMin,
+    leftMin,
+    posterUrl,
+    logoUrl,
+    bandColor,
+    bandTextColor,
+    url,
+  };
+}
+
+// Shared fetch/cache/error plumbing for the resume and next-up widgets.
+// `cacheRef` is mutated in place (its properties, not the binding itself)
+// so callers keep their own module-level cache variable — each MUST also
+// be cleared in invalidate(), or a settings change (URL/key/user) keeps
+// serving a stale answer for up to 30 more seconds.
+async function fetchItemWidget(cacheRef, force, buildPath, withProgress) {
+  const s = await settings.load();
+  const urlBase = (s.jellyfin.url || '').replace(/\/+$/, '');
+  const apiKey = s.jellyfin.apiKey || '';
+  const userId = (s.jellyfin.userId || '').trim();
+  if (!urlBase || !apiKey) {
+    return { ok: false, items: [], error: 'Jellyfin is not configured.' };
+  }
+  if (!userId) {
+    return { ok: false, items: [], error: 'Jellyfin user is not selected.' };
+  }
+  const now = Date.now();
+  if (!force && cacheRef.data && now - cacheRef.at < CACHE_MS) return cacheRef.data;
+  try {
+    const serverId = await getServerId(urlBase, apiKey);
+    const res = await fetch(`${urlBase}${buildPath(userId)}`, {
+      headers: { Authorization: `MediaBrowser Token="${apiKey}"` },
+      signal: AbortSignal.timeout(5000),
+    });
+    if (!res.ok) throw new Error(`${res.status} ${res.statusText}`);
+    const body = await res.json();
+    const rawItems = Array.isArray(body.Items) ? body.Items : [];
+    const items = rawItems.map((it) => formatJellyfinItem(it, urlBase, serverId, withProgress));
+    const data = { ok: true, items, error: null };
+    cacheRef.at = now;
+    cacheRef.data = data;
+    return data;
+  } catch (e) {
+    const data = { ok: false, items: [], error: describeFetchFailure(e, urlBase).message };
+    cacheRef.at = now;
+    cacheRef.data = data;
+    return data;
+  }
+}
+
+// Continue-watching data for the "jump into your next episode" widget.
+// Never throws; on any failure returns ok:false with a message that
+// never contains the API key.
+async function resumeList(force = false) {
+  return fetchItemWidget(
+    resumeCache,
+    force,
+    (userId) =>
+      `/Users/${encodeURIComponent(userId)}/Items/Resume?Limit=12&MediaTypes=Video&Fields=ImageBlurHashes,ParentLogoItemId`,
+    true
+  );
+}
+
+// "Up next" data — episodes not yet started, for a separate widget next
+// to continue-watching. enableResumable=false is load-bearing: without
+// it NextUp also returns part-watched episodes, duplicating resumeList().
+// progress is always null here — these are unstarted, so there is
+// genuinely nothing to report (not a fabricated 0, which would read as
+// "started and abandoned").
+async function nextUpList(force = false) {
+  return fetchItemWidget(
+    nextUpCache,
+    force,
+    (userId) =>
+      `/Shows/NextUp?userId=${encodeURIComponent(userId)}&enableResumable=false&Limit=12&Fields=ImageBlurHashes,ParentLogoItemId`,
+    false
+  );
+}
+
+// Live "now playing" data for the VHS-cassette now-playing widget. Same
+// item shape as resumeList()/nextUpList() (built by the same
+// formatJellyfinItem formatter — poster/logo/bandColor/url are identical
+// in form) plus playback-only fields: userName, isPaused, playMethod,
+// transcodeReason, client, device.
+//
+// One item per active session — multiple people can be watching at once.
+// Nothing playing is a normal state, not an error: { ok: true, items: [] }.
+// Cached for only NOWPLAYING_CACHE_MS (5s, not the usual 30s) since a
+// stale paused/playing flag or position is worse than a slightly higher
+// call rate. Never throws; on failure returns ok:false with a message
+// that never contains the API key.
+async function nowPlaying(force = false) {
+  const s = await settings.load();
+  const urlBase = (s.jellyfin.url || '').replace(/\/+$/, '');
+  const apiKey = s.jellyfin.apiKey || '';
+  if (!urlBase || !apiKey) {
+    return { ok: false, items: [], error: 'Jellyfin is not configured.' };
+  }
+  const now = Date.now();
+  if (!force && nowPlayingCache.data && now - nowPlayingCache.at < NOWPLAYING_CACHE_MS) return nowPlayingCache.data;
+  try {
+    const serverId = await getServerId(urlBase, apiKey);
+    const res = await fetch(`${urlBase}/Sessions`, {
+      headers: { Authorization: `MediaBrowser Token="${apiKey}"` },
+      signal: AbortSignal.timeout(5000),
+    });
+    if (!res.ok) throw new Error(`${res.status} ${res.statusText}`);
+    const sessions = await res.json();
+    const playing = (Array.isArray(sessions) ? sessions : []).filter((sess) => sess.NowPlayingItem);
+    const items = playing.map((session) => {
+      const it = session.NowPlayingItem;
+      const playState = session.PlayState || {};
+      const transcodingInfo = session.TranscodingInfo || {};
+      const positionTicks = typeof playState.PositionTicks === 'number' ? playState.PositionTicks : null;
+      const base = formatJellyfinItem(it, urlBase, serverId, true, positionTicks);
+      const reasons = Array.isArray(transcodingInfo.TranscodeReasons) ? transcodingInfo.TranscodeReasons : [];
+      return {
+        ...base,
+        userName: session.UserName || 'Unknown',
+        isPaused: Boolean(playState.IsPaused),
+        playMethod: playState.PlayMethod || null,
+        transcodeReason: reasons.length ? reasons[0] : null,
+        client: session.Client || null,
+        device: session.DeviceName || null,
+      };
+    });
+    const data = { ok: true, items, error: null };
+    nowPlayingCache = { at: now, data };
+    return data;
+  } catch (e) {
+    const data = { ok: false, items: [], error: describeFetchFailure(e, urlBase).message };
+    nowPlayingCache = { at: now, data };
+    return data;
+  }
+}
+
+// Lists Jellyfin accounts so the settings page can render a picker. Must
+// work with only url+apiKey saved, before a userId has been chosen.
+// Never includes the API key in the response or in an error message.
+async function listUsers() {
+  const s = await settings.load();
+  const urlBase = (s.jellyfin.url || '').replace(/\/+$/, '');
+  const apiKey = s.jellyfin.apiKey || '';
+  if (!urlBase || !apiKey) {
+    return { ok: false, users: [], error: 'Jellyfin is not configured.' };
+  }
+  try {
+    const res = await fetch(`${urlBase}/Users`, {
+      headers: { Authorization: `MediaBrowser Token="${apiKey}"` },
+      signal: AbortSignal.timeout(5000),
+    });
+    if (!res.ok) throw new Error(`${res.status} ${res.statusText}`);
+    const list = await res.json();
+    const users = Array.isArray(list) ? list.map((u) => ({ id: u.Id, name: u.Name || 'Unknown' })) : [];
+    return { ok: true, users, error: null };
+  } catch (e) {
+    return { ok: false, users: [], error: describeFetchFailure(e, urlBase).message };
+  }
+}
+
+module.exports = { configured, getSessions, resumeList, nextUpList, nowPlaying, listUsers, invalidate };

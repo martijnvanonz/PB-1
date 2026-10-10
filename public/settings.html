@@ -1,0 +1,152 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Patchbay — Settings</title>
+<script>
+(function () {
+  var t = 'ko';
+  try {
+    var stored = localStorage.getItem('hc1-theme');
+    if (stored === 'ko' || stored === 'riddim') t = stored;
+  } catch (e) { /* localStorage unavailable */ }
+  document.documentElement.setAttribute('data-theme', t);
+})();
+</script>
+<link rel="stylesheet" href="/styles.css">
+</head>
+<body>
+
+<div class="wrap" id="settings-app">
+
+  <div class="chiprow">
+    <button class="chip" id="chip-back" type="button">&larr; BACK</button>
+    <button class="chip dk" id="chip-theme" type="button">THEME · KO</button>
+  </div>
+
+  <div class="plate">
+    <div>
+      <div class="plate-model">SETTINGS</div>
+      <div class="plate-sub">HC&#8209;1 CONFIGURATION</div>
+    </div>
+    <div class="plate-desc">DEVICE / PANGOLIN / TRUENAS / JELLYFIN</div>
+  </div>
+
+  <form id="settings-form" novalidate>
+
+    <section class="settings-section">
+      <div class="section-head"><span class="lbl">DEVICE</span></div>
+      <div class="settings-grid">
+        <label class="settings-field">MODEL
+          <input type="text" name="branding.model" placeholder="PB-1" autocomplete="off">
+        </label>
+        <label class="settings-field">SUBTITLE
+          <input type="text" name="branding.subtitle" placeholder="サーバー" autocomplete="off">
+        </label>
+      </div>
+    </section>
+
+    <section class="settings-section">
+      <div class="section-head">
+        <span class="lbl">PANGOLIN</span>
+        <button class="section-btn" type="button" id="test-pangolin">TEST</button>
+      </div>
+      <div class="settings-grid">
+        <label class="settings-field">API URL
+          <input type="url" name="pangolin.apiUrl" placeholder="https://pangolin.example.com" autocomplete="off">
+        </label>
+        <label class="settings-field">ORG ID
+          <input type="text" name="pangolin.orgId" placeholder="homelab" autocomplete="off">
+        </label>
+        <label class="settings-field">API KEY
+          <input type="password" name="pangolin.apiKey" autocomplete="off">
+          <span class="field-help" id="hint-pangolin"></span>
+        </label>
+        <details class="key-help">
+          <summary>HOW DO I GET A KEY?</summary>
+          <div class="key-help-body">
+            <p>Pangolin dashboard → your organisation → Settings → API Keys → Generate.</p>
+            <p>Give it exactly three permissions, using Organization scope — not a root key, and never "Allow All Permissions":</p>
+            <ul>
+              <li>Site → List Sites</li>
+              <li>Resource → List Resources</li>
+              <li>Resource → List Site Resources</li>
+            </ul>
+            <p>The key is <strong>shown once</strong> — copy it before you leave the page. It cannot be read back afterward.</p>
+            <p>The API URL above is just the host — this app adds <code>/v1</code> itself.</p>
+          </div>
+        </details>
+      </div>
+      <div class="test-result" id="test-result-pangolin" hidden></div>
+    </section>
+
+    <section class="settings-section">
+      <div class="section-head">
+        <span class="lbl">TRUENAS</span>
+        <span class="section-note">NOT USED YET</span>
+      </div>
+      <div class="settings-grid">
+        <label class="settings-field">URL
+          <input type="url" name="truenas.url" placeholder="http://localhost or https://nas.example.com" autocomplete="off">
+          <span class="field-help">Running on the NAS itself? Use <code>http://localhost</code>. Running elsewhere? The LAN address or the public hostname both work.</span>
+        </label>
+        <label class="settings-field">API KEY
+          <input type="password" name="truenas.apiKey" autocomplete="off">
+          <span class="field-help" id="hint-truenas"></span>
+        </label>
+        <details class="key-help">
+          <summary>HOW DO I GET A KEY?</summary>
+          <div class="key-help-body">
+            <p>TrueNAS 25.04 changed API keys to inherit the privileges of the account that made them — a key made on your admin account can do anything your admin account can. Make a restricted account instead:</p>
+            <ol>
+              <li>Credentials → Users → Add. Create a service account, e.g. <code>hc1-dashboard</code>.</li>
+              <li>Give it the <strong>READONLY_ADMIN</strong> role — this is what makes the key read-only.</li>
+              <li>Sign in as that account, then top-right user menu → My API Keys → Add.</li>
+            </ol>
+            <p>The key is <strong>shown once</strong> — TrueNAS will not show it again after you leave the page.</p>
+          </div>
+        </details>
+      </div>
+    </section>
+
+    <section class="settings-section">
+      <div class="section-head">
+        <span class="lbl">JELLYFIN</span>
+        <span class="section-note">OPTIONAL — REQUIRED FOR THE RESUME AND UP NEXT WIDGETS</span>
+      </div>
+      <div class="settings-grid">
+        <label class="settings-field">URL
+          <input type="url" name="jellyfin.url" placeholder="https://jellyfin.example.com" autocomplete="off">
+        </label>
+        <label class="settings-field">API KEY
+          <input type="password" name="jellyfin.apiKey" autocomplete="off">
+          <span class="field-help" id="hint-jellyfin"></span>
+        </label>
+        <label class="settings-field">USER
+          <select name="jellyfin.userId" id="jellyfin-user-select" disabled></select>
+          <span class="field-help" id="jellyfin-user-help">Save a URL and API key, then reload this page to choose a user.</span>
+        </label>
+        <details class="key-help">
+          <summary>HOW DO I GET A KEY?</summary>
+          <div class="key-help-body">
+            <p>Jellyfin Dashboard → Advanced → API Keys → "+".</p>
+            <p>Jellyfin has no read-only key type, unlike Pangolin and TrueNAS — this key can technically do more than this dashboard needs. Said plainly: this app only ever makes read requests, never writes anything.</p>
+            <p>The key is <strong>shown once</strong> when you create it — copy it before you navigate away.</p>
+            <p>The USER field above decides whose "continue watching" and "up next" lists appear on the dashboard.</p>
+          </div>
+        </details>
+      </div>
+    </section>
+
+    <div class="modal-error" id="form-error" hidden></div>
+
+    <div class="edit-actions">
+      <button class="btn btn-primary" type="submit">SAVE</button>
+    </div>
+  </form>
+</div>
+
+<script src="/settings.js"></script>
+</body>
+</html>

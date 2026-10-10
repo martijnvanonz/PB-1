@@ -1,0 +1,1344 @@
+/* ===========================================================================
+   PB-1 — Patchbay. EP-series device face. Two colourways: ko, riddim.
+   Every colour comes from a token below. Add a colourway by adding a new
+   :root[data-theme="x"] block — nothing else should need to change.
+   =========================================================================== */
+
+:root {
+  --body: #B4B4AF;
+  /* The tray a tape-slider widget's cassettes sit on (.widget-card--bare)
+     — a little lighter than --body so the widget still reads as a raised
+     surface, not a hole in the page. See the fallback value here; the
+     colourway blocks below carry the real tuned numbers. */
+  --tray: #C6C6C1;
+  --chip-bg: #CFCFCA; --chip-fg: #4A4A46;
+  --chip-dk-bg: #1C1C1C; --chip-dk-fg: #CFCFCA;
+  --plate-bg: #E7E7E3; --plate-fg: #1C1C1C;
+  --sub: #F04E23; --desc: #6E6E68;
+  --scr-bg: #0D0D0D; --scr-fg: #FF4B1A; --scr-meta: #6A6A62; --scr-em: #D8D6CE;
+  --lab: #5E5E58; --dot: #1C1C1C;
+  --key-bg: #1C1C1C; --key-fg: #E6E4DC; --key-ft: #7C7C74;
+  --key-alt-bg: #DEDEDA; --key-alt-fg: #1C1C1C; --key-alt-ft: #6E6E68;
+  --key-empty: #ABABA6; --bar: #4A4A44; --bar-alt: #A8A8A2;
+  --alert: #F04E23; --alert-fg: #1C1C1C;
+  /* Cassette widget (VHS tape component) — shell/window/label tones, one
+     set per colourway. See the "---------- vhs cassette widget ----------"
+     section below for the component itself. */
+  --shell: #1C1C1C; --shell-hi: #2A2A2A; --shell-lo: #0B0B0B; --moulded: #6E6E68;
+  --window: #3B3B38; --tape: #0C0C0C; --hub: #D8D6CE; --hub-lo: #8E8E86;
+  --label: #EFEDE6; --label-fg: #181818; --label-dim: #56564E; --label-line: #CECBC2;
+  --signal: #F04E23;
+  /* The handwritten watcher's name (.hand-name) is real marker ink, not a
+     themed UI colour — it doesn't change between colourways any more
+     than a Sharpie would, so this lives only here (not duplicated into
+     the ko/riddim blocks below) and cascades to both. */
+  --ink: #1A1A2E;
+}
+
+:root[data-theme="ko"] {
+  --body: #B4B4AF;
+  --tray: #C6C6C1;
+  --chip-bg: #CFCFCA; --chip-fg: #4A4A46;
+  --chip-dk-bg: #1C1C1C; --chip-dk-fg: #CFCFCA;
+  --plate-bg: #E7E7E3; --plate-fg: #1C1C1C;
+  --sub: #F04E23; --desc: #6E6E68;
+  --scr-bg: #0D0D0D; --scr-fg: #FF4B1A; --scr-meta: #6A6A62; --scr-em: #D8D6CE;
+  --lab: #5E5E58; --dot: #1C1C1C;
+  --key-bg: #1C1C1C; --key-fg: #E6E4DC; --key-ft: #7C7C74;
+  --key-alt-bg: #DEDEDA; --key-alt-fg: #1C1C1C; --key-alt-ft: #6E6E68;
+  --key-empty: #ABABA6; --bar: #4A4A44; --bar-alt: #A8A8A2;
+  --alert: #F04E23; --alert-fg: #1C1C1C;
+  --shell: #1C1C1C; --shell-hi: #2A2A2A; --shell-lo: #0B0B0B; --moulded: #6E6E68;
+  --window: #3B3B38; --tape: #0C0C0C; --hub: #D8D6CE; --hub-lo: #8E8E86;
+  --label: #EFEDE6; --label-fg: #181818; --label-dim: #56564E; --label-line: #CECBC2;
+  --signal: #F04E23;
+}
+
+:root[data-theme="riddim"] {
+  --body: #E9E4D4;
+  /* Brighter than the #F2EEE1 first suggested — that measured only
+     1.10:1 against --body (a surface needs roughly 1.15:1 to read as
+     distinct at all); this clears it with a small margin while staying a
+     warm cream, not a stark white. */
+  --tray: #FAF6EC;
+  --chip-bg: #DAD4C1; --chip-fg: #5E6A5C;
+  --chip-dk-bg: #0C5C38; --chip-dk-fg: #E4EFE8;
+  --plate-bg: #F3F0E6; --plate-fg: #0C5C38;
+  --sub: #F04E23; --desc: #79856F;
+  --scr-bg: #17A05A; --scr-fg: #0A3D24; --scr-meta: #0A5A33; --scr-em: #042A16;
+  --lab: #79856F; --dot: #0C5C38;
+  --key-bg: #F3F0E6; --key-fg: #0C5C38; --key-ft: #88927E;
+  --key-alt-bg: #0C5C38; --key-alt-fg: #EDEAD9; --key-alt-ft: #7FA893;
+  --key-empty: #DFDACA; --bar: #C3C0AF; --bar-alt: #3E7D5D;
+  --alert: #F04E23; --alert-fg: #1C1C1C;
+  --shell: #122B1D; --shell-hi: #1B3A28; --shell-lo: #06140C; --moulded: #6E8A72;
+  --window: #2C4436; --tape: #050F09; --hub: #CFE0CB; --hub-lo: #7E9A7A;
+  --label: #F4F1E7; --label-fg: #0A3D24; --label-dim: #4E5E48; --label-line: #D4CFBF;
+  --signal: #17A05A;
+}
+
+/* Vendored (public/vendor/caveat-bold.woff2), never a CDN — this app runs
+   with no internet. Caveat, OFL-licensed (public/vendor/caveat.OFL.txt),
+   is the closest thing a self-hosted repo has to a real handwriting face
+   for .hand-name's "someone wrote this in marker" effect. font-display
+   swap means the fallback stack on .hand-name renders immediately and
+   swaps in once this loads, rather than a flash of invisible text. */
+@font-face {
+  font-family: 'Caveat';
+  src: url('/vendor/caveat-bold.woff2') format('woff2');
+  font-weight: 700;
+  font-style: normal;
+  font-display: swap;
+}
+
+/* Author rules must win over the UA [hidden] tie — nothing on this page may
+   set display on an element carrying [hidden]. */
+[hidden] { display: none !important; }
+
+* { box-sizing: border-box; }
+
+html, body {
+  margin: 0;
+  padding: 0;
+  background: var(--body);
+  color: var(--lab);
+  font-family: ui-monospace, "SF Mono", Menlo, Consolas, monospace;
+  -webkit-font-smoothing: antialiased;
+  overflow-x: hidden;
+}
+
+button, input, select {
+  font-family: inherit;
+  color: inherit;
+}
+
+:focus-visible {
+  outline: 2px solid var(--alert);
+  outline-offset: 2px;
+}
+
+.wrap {
+  max-width: 1080px;
+  margin: 0 auto;
+  padding: 14px 14px 40px;
+}
+
+/* ---------- chip row ---------- */
+
+.chiprow {
+  display: flex;
+  gap: 2px;
+  flex-wrap: wrap;
+  align-items: center;
+  margin-bottom: 9px;
+}
+
+.chip {
+  font-size: 8px;
+  letter-spacing: .15em;
+  text-transform: uppercase;
+  padding: 3px 8px;
+  background: var(--chip-bg);
+  color: var(--chip-fg);
+  border: none;
+  cursor: default;
+  font-variant-numeric: tabular-nums;
+}
+
+button.chip { cursor: pointer; }
+.chip.dk { background: var(--chip-dk-bg); color: var(--chip-dk-fg); }
+.chip.on { background: var(--alert); color: var(--alert-fg); }
+
+/* ---------- notice ---------- */
+
+.notice {
+  background: var(--plate-bg);
+  color: var(--plate-fg);
+  font-size: 9px;
+  letter-spacing: .12em;
+  text-transform: uppercase;
+  padding: 7px 10px 7px 9px;
+  margin-bottom: 9px;
+  border-left: 3px solid var(--alert);
+}
+
+.notice a { color: inherit; text-decoration: underline; }
+
+/* ---------- name plate ---------- */
+
+.plate {
+  background: var(--plate-bg);
+  color: var(--plate-fg);
+  padding: 11px 13px 12px;
+  margin-bottom: 9px;
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-end;
+  gap: 14px;
+  flex-wrap: wrap;
+}
+
+.plate-model {
+  font-family: "Helvetica Neue", Helvetica, Arial, sans-serif;
+  font-size: 23px;
+  letter-spacing: -.01em;
+  line-height: 1;
+}
+
+.plate-sub {
+  font-size: 9px;
+  letter-spacing: .28em;
+  text-transform: uppercase;
+  margin-top: 4px;
+  color: var(--sub);
+}
+
+.plate-desc {
+  font-size: 8px;
+  letter-spacing: .2em;
+  text-transform: uppercase;
+  color: var(--desc);
+}
+
+/* ---------- screen ---------- */
+
+.scr {
+  background: var(--scr-bg);
+  color: var(--scr-fg);
+  padding: 11px 13px 12px;
+  margin-bottom: 14px;
+}
+
+.scr-top {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 12px;
+  flex-wrap: wrap;
+  margin-bottom: 9px;
+}
+
+.scr-big {
+  font-size: 30px;
+  line-height: 1;
+  letter-spacing: -.02em;
+  font-variant-numeric: tabular-nums;
+}
+
+.scr-big small {
+  font-size: 10px;
+  letter-spacing: .18em;
+  margin-left: 7px;
+  vertical-align: 3px;
+}
+
+.scr-meta {
+  font-size: 8px;
+  letter-spacing: .16em;
+  text-transform: uppercase;
+  display: flex;
+  gap: 13px;
+  flex-wrap: wrap;
+  color: var(--scr-meta);
+}
+
+.scr-meta em {
+  font-style: normal;
+  color: var(--scr-em);
+  font-variant-numeric: tabular-nums;
+}
+
+.scr-glyphs {
+  display: flex;
+  gap: 3px;
+  flex-wrap: wrap;
+  align-items: center;
+  max-width: 60%;
+}
+
+.gl { width: 11px; height: 11px; display: block; flex: none; }
+.gl-up { background: var(--scr-fg); }
+.gl-down { background: var(--alert); }
+.gl-off { background: var(--scr-meta); }
+.gl-checking { background: var(--scr-meta); opacity: .55; }
+
+/* Reserved for live TrueNAS telemetry (CPU / MEM / POOL / UP) — empty and
+   hidden until that data exists. Four label/value pairs, same rhythm as
+   .scr-meta above it. */
+.scr-sys {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 10px;
+  margin-top: 10px;
+  padding-top: 9px;
+  border-top: 1px solid rgba(128, 128, 128, .25);
+}
+
+.scr-sys-item {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.scr-sys-lab {
+  font-size: 7.5px;
+  letter-spacing: .14em;
+  text-transform: uppercase;
+  color: var(--scr-meta);
+}
+
+.scr-sys-val {
+  font-size: 13px;
+  font-variant-numeric: tabular-nums;
+  color: var(--scr-em);
+}
+
+/* Reserved for a genuinely bad state only — an unhealthy/non-ONLINE pool.
+   Never applied to CPU, MEM, or UP; a working NAS stays in the quiet token
+   above even at high utilisation. */
+.scr-sys-val.bad { color: var(--alert); }
+
+/* ---------- section head (groups / tray) ---------- */
+
+.section-head {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  border-bottom: 1px solid var(--chip-bg);
+  padding-bottom: 6px;
+  margin: 20px 0 8px;
+}
+
+.section-head .lbl {
+  font-size: 8.5px;
+  letter-spacing: .18em;
+  text-transform: uppercase;
+  color: var(--lab);
+  flex: 1;
+  min-width: 0;
+}
+
+.section-head .lbl[contenteditable="true"] {
+  color: var(--plate-fg);
+  border-bottom: 1px dashed var(--sub);
+  outline-offset: 3px;
+}
+
+.section-btn {
+  background: none;
+  border: none;
+  color: var(--lab);
+  font-family: inherit;
+  font-size: 8.5px;
+  letter-spacing: .1em;
+  text-transform: uppercase;
+  cursor: pointer;
+  padding: 2px 4px;
+}
+.section-btn:hover { text-decoration: underline; }
+.section-btn.armed { font-weight: 700; text-decoration: underline; }
+
+/* Group reorder. A triangle glyph fills less of its em box than a capital
+   letter, so it needs a size ABOVE the 8.5px DELETE label to read as its
+   equal rather than as a speck beside it. The min box keeps the target
+   thumb-sized on a tablet; without it the glyph alone measures ~15x13.
+   These must never gain the text underline the word buttons use on hover. */
+.section-arrow {
+  font-size: 10px;
+  line-height: 1;
+  padding: 3px 5px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 24px;
+  min-height: 24px;
+}
+.section-arrow:hover:not(:disabled) {
+  text-decoration: none;
+  color: var(--plate-fg);
+}
+.section-arrow:disabled {
+  opacity: .25;
+  cursor: default;
+}
+
+.group-block { margin-bottom: 6px; }
+
+.empty-state {
+  font-size: 9px;
+  letter-spacing: .08em;
+  text-transform: uppercase;
+  color: var(--lab);
+  border: 1px dashed var(--chip-bg);
+  padding: 18px;
+  text-align: center;
+}
+
+/* ---------- keypad ---------- */
+
+.pad {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  /* A uniform row height so a multi-row item's declared grid-row: span N
+     (set inline from WIDGET_TYPES.rowSpan in app.js) reserves exactly N
+     key-heights — no more, no less. Every plain .key already renders at
+     exactly 66px (its min-height, never exceeded in normal browsing), so
+     the floor is never padding empty space there; minmax's `auto` ceiling
+     only engages in EDIT mode, where a key's FAV/HIDE row legitimately
+     needs more room — rows grow together instead of clipping, and a
+     widget's own footprint grows by the same native grid math, so it
+     still never overhangs or leaves a hole. */
+  grid-auto-rows: minmax(66px, auto);
+  gap: 7px;
+}
+
+.slot { min-width: 0; }
+
+.slot-lab {
+  font-size: 8px;
+  letter-spacing: .13em;
+  text-transform: uppercase;
+  margin-bottom: 4px;
+  display: flex;
+  align-items: center;
+  gap: 5px;
+  color: var(--lab);
+  overflow: hidden;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+}
+
+.slot-lab i {
+  width: 4px; height: 4px;
+  border-radius: 50%;
+  display: block;
+  flex: 0 0 auto;
+  background: var(--dot);
+}
+.slot-lab.bad i { background: var(--alert); }
+
+.key {
+  padding: 10px 11px 11px;
+  min-height: 66px;
+  display: flex;
+  flex-direction: column;
+  justify-content: space-between;
+  background: var(--key-bg);
+  color: var(--key-fg);
+  text-decoration: none;
+}
+
+/* Set the base colour here (not just on .key-nm) so every descendant that
+   relies on `color: inherit` — mini buttons, suggestion chips, anything
+   added later — follows the alt key automatically. Footer/bars/monogram
+   opt back into the dimmer --key-alt-ft below; everything else stays bright. */
+.key.alt { background: var(--key-alt-bg); color: var(--key-alt-fg); }
+.key.alt .key-ft { color: var(--key-alt-ft); }
+.key.alt .bars i { background: var(--bar-alt); }
+
+.key.is-hidden { opacity: .45; }
+.key.empty { background: var(--key-empty); min-height: 66px; }
+
+.key.drag-over { outline: 2px dashed var(--scr-fg); outline-offset: -2px; }
+.widget-card.drag-over { outline: 2px dashed var(--scr-fg); outline-offset: -2px; }
+
+.key-top {
+  display: flex;
+  align-items: center;
+  gap: 5px;
+}
+
+/* Greyscale so a third-party logo reads as a printed mark on the panel,
+   not a glossy sticker. A CSS filter, not a canvas — these icons are
+   cross-origin, and any pixel-reading approach (canvas getImageData/
+   toDataURL, or an alpha-mask, which would just block out most
+   opaque-square favicons anyway) would throw or misbehave. Fixed box so a
+   slow-loading icon never shifts the key layout. */
+.key-ic {
+  width: 18px; height: 18px;
+  flex: none;
+  object-fit: contain;
+  filter: grayscale(1);
+}
+
+.key-ic-mono {
+  width: 18px; height: 18px;
+  flex: none;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 9px;
+  text-transform: uppercase;
+  color: var(--key-ft);
+  opacity: .7;
+}
+.key.alt .key-ic-mono { color: var(--key-alt-ft); }
+
+.key-nm {
+  font-family: "Helvetica Neue", Helvetica, Arial, sans-serif;
+  font-size: 14px;
+  font-weight: 400;
+  letter-spacing: -.005em;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  flex: 1;
+  min-width: 0;
+}
+
+/* No real history is collected yet — bars render as an honest flat,
+   evenly muted strip rather than fabricated waveform data. While a check
+   is genuinely in flight for this URL (.is-checking, added by app.js only
+   between the ping actually starting and its result landing — never for a
+   queued-but-not-yet-started or permanently-unknown entry), a travelling
+   highlight sweeps across the strip instead: one bar bright, the rest
+   dim, looping. Per-bar delay (nth-child below) plus a per-key delay (the
+   --key-delay custom property, set inline from the slot index) keep a
+   panel of checking keys from pulsing in lockstep. Pure CSS — no JS timer
+   drives this, app.js only toggles the class and one custom property. */
+.bars { display: flex; gap: 1.5px; align-items: flex-end; height: 8px; }
+.bars i { width: 2.5px; display: block; height: 8px; background: var(--bar); opacity: .6; }
+
+.bars.is-checking i { opacity: .25; }
+.bars.is-checking i:nth-child(1) { opacity: 1; } /* reduced-motion fallback: one static bright bar */
+
+@keyframes bar-sweep {
+  0%, 100% { opacity: .25; }
+  15% { opacity: 1; }
+  35% { opacity: .25; }
+}
+.bars.is-checking i {
+  animation: bar-sweep 1.2s ease-in-out infinite;
+  animation-delay: calc(var(--key-delay, 0s) + var(--bar-delay, 0s));
+}
+.bars.is-checking i:nth-child(1) { --bar-delay: 0s; }
+.bars.is-checking i:nth-child(2) { --bar-delay: .12s; }
+.bars.is-checking i:nth-child(3) { --bar-delay: .24s; }
+.bars.is-checking i:nth-child(4) { --bar-delay: .36s; }
+.bars.is-checking i:nth-child(5) { --bar-delay: .48s; }
+.bars.is-checking i:nth-child(6) { --bar-delay: .6s; }
+.bars.is-checking i:nth-child(7) { --bar-delay: .72s; }
+.bars.is-checking i:nth-child(8) { --bar-delay: .84s; }
+.bars.is-checking i:nth-child(9) { --bar-delay: .96s; }
+.bars.is-checking i:nth-child(10) { --bar-delay: 1.08s; }
+
+.key-ft {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 7px;
+  font-size: 8.5px;
+  letter-spacing: .08em;
+  font-variant-numeric: tabular-nums;
+  margin-top: 9px;
+  color: var(--key-ft);
+}
+
+.key-lat {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+}
+.key-lat i {
+  width: 4px; height: 4px;
+  border-radius: 50%;
+  display: block;
+  flex: none;
+  background: currentColor;
+}
+
+.key-ft .st {
+  padding: 1px 5px;
+  letter-spacing: .14em;
+  font-size: 7.5px;
+}
+.key-ft .st.down { background: var(--alert); color: var(--alert-fg); }
+
+.key-edit-row {
+  display: flex;
+  gap: 8px;
+  margin-top: 8px;
+  flex-wrap: wrap;
+}
+
+.key-mini-btn {
+  background: none;
+  border: none;
+  color: inherit;
+  font-family: inherit;
+  font-size: 8px;
+  letter-spacing: .08em;
+  text-transform: uppercase;
+  cursor: pointer;
+  padding: 0;
+  opacity: .8;
+}
+.key-mini-btn:hover { opacity: 1; text-decoration: underline; }
+.key-mini-btn.armed { font-weight: 700; text-decoration: underline; }
+.key-mini-btn.on-state { opacity: 1; text-decoration: underline; }
+
+/* Suggestion chip: a Pangolin label colour may appear ONLY as this 6px dot. */
+.suggestion-btn { display: inline-flex; align-items: center; gap: 4px; }
+.sugg-dot { width: 6px; height: 6px; border-radius: 50%; display: inline-block; flex: none; }
+
+/* ---------- widget ---------- */
+
+/* A widget is a placed layout item like any key — same grid, same edit-mode
+   affordances — but it earns more than one column's width, so it spans 2
+   of the pad's 4 columns (2 of 2 on the narrow layout below, i.e. the full
+   row). */
+/* Column AND row span are set inline from WIDGET_TYPES (app.js) — the
+   registry is the single source of the footprint, not this file, so a
+   future widget of a different shape overrides both without a CSS change. */
+.widget-slot { min-width: 0; }
+
+.widget-card {
+  padding: 10px 11px 11px;
+  height: 100%; /* fill the slot's full reserved footprint exactly */
+  box-sizing: border-box;
+  overflow: hidden; /* safety clip — content is capped to fit, this should never engage */
+  display: flex;
+  flex-direction: column;
+  gap: 7px;
+  background: var(--key-bg);
+  color: var(--key-fg);
+}
+
+/* A widget that draws its own objects (the VHS cassettes) rather than
+   filling the card with key-shaped rows must NOT sit on --key-bg — the
+   cassette's --shell tokens are dark, near-identical to --key-bg in ko,
+   and the shell disappeared into the card entirely. It must not sit on
+   nothing either — fully transparent read as a hole in the page, not a
+   widget. --tray is a real surface, tuned a little lighter than --body
+   in each theme (see the :root blocks) so the card still reads as a
+   raised tray, distinct from both the page behind it and the near-black
+   key cards beside it. .widget-lab and .dot are re-pinned to --lab (the
+   token this app already uses for label text that sits directly on
+   --body, e.g. .section-head .lbl) since --key-ft was tuned for
+   legibility on the dark card this widget no longer has. */
+.widget-card--bare {
+  background: var(--tray);
+}
+.widget-card--bare .widget-lab { color: var(--lab); }
+.widget-card--bare .dot { background: var(--lab); }
+
+.widget-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+
+.widget-lab {
+  font-size: 8px;
+  letter-spacing: .14em;
+  text-transform: uppercase;
+  color: var(--key-ft);
+}
+
+.widget-body {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  flex: 1;
+  min-height: 0;
+}
+
+.widget-line {
+  font-size: 9px;
+  letter-spacing: .08em;
+  text-transform: uppercase;
+  color: var(--key-ft);
+}
+
+/* Modelled on .notice — a quiet accent border, never a filled alert wall. */
+.widget-notice {
+  font-size: 9px;
+  letter-spacing: .04em;
+  color: var(--key-fg);
+  border-left: 3px solid var(--alert);
+  padding: 3px 0 3px 8px;
+}
+
+/* ===========================================================================
+   VHS CASSETTE WIDGET — ported verbatim from the approved mockup
+   (vhs-template.html / stack-shell.html). Geometry is measured off a real
+   VHS shell (187 x 103mm) and MUST NOT be "tidied" — see the comments
+   inline. Colours come from the --shell/--window/--label/… tokens above,
+   one set per colourway, so the object itself never hardcodes a colour.
+   =========================================================================== */
+
+.tapes { display: flex; flex-direction: column; gap: 12px; align-items: flex-start; }
+
+.vhs {
+  --hue: #8A8A8A;
+  position: relative; display: block; text-decoration: none; color: inherit;
+  width: min(500px, 100%); aspect-ratio: 187/103;
+  container-type: inline-size;
+  /* fine moulded dimple, so bare shell reads as plastic and not as a gap */
+  background:
+    repeating-linear-gradient(90deg, rgba(255,255,255,.022) 0 1px, transparent 1px 3px),
+    repeating-linear-gradient(0deg, rgba(0,0,0,.20) 0 1px, transparent 1px 3px),
+    var(--shell);
+  border-radius: 9px;
+  box-shadow: 0 2px 0 var(--shell-lo), 0 6px 14px rgba(0,0,0,.28),
+              inset 0 1px 0 rgba(255,255,255,.05);
+  flex: none;
+}
+.vhs:focus-visible { outline: 2px solid var(--signal); outline-offset: 3px; }
+
+/* the lid seam: the horizontal line the flap opens on */
+.vhs::after {
+  content: ""; position: absolute; left: 0; right: 0; top: 19%; height: 1px;
+  background: linear-gradient(90deg, transparent, rgba(0,0,0,.75) 6%, rgba(0,0,0,.75) 94%, transparent);
+  box-shadow: 0 1px 0 rgba(255,255,255,.05);
+}
+
+/* the moulded instruction text along the top edge — same fixed text on
+   every tape, live or not. Who's watching now lives on the paper label
+   itself (.hand-name below), not moulded into the plastic. */
+.moulded {
+  position: absolute; left: 5.8%; right: 5.8%; top: 5%;
+  display: flex; justify-content: space-between; align-items: center;
+  font-family: ui-monospace, Menlo, monospace; font-size: 1.35cqw; letter-spacing: .16em;
+  text-transform: uppercase; color: var(--moulded); opacity: .62;
+}
+.moulded .vhsmark {
+  border: 1px solid currentColor; border-radius: 1px; padding: .2cqw .8cqw;
+  font-size: 1.4cqw; letter-spacing: .22em; opacity: .9;
+}
+
+/* windows, measured off a reference photo: ~19.5% wide x 50% tall, sitting
+   at top:26% of the shell. Percentage padding on .win is FORBIDDEN — it
+   resolves against the tape's width, not the window's, and crushes the
+   reel to a dot. */
+.win {
+  position: absolute; top: 26%; height: 50%; width: 19.5%;
+  border-radius: 22%/11%;
+  background: var(--window);
+  box-shadow: inset 0 2px 8px rgba(0,0,0,.8), 0 0 0 1px rgba(255,255,255,.05);
+  display: block; overflow: hidden;
+}
+.win--l { left: 4.0%; }
+.win--r { left: 76.5%; }
+
+/* the reel hubs sit closer together than the windows do, so each aperture
+   shows the outer flank of its reel and the hub is pushed toward the
+   inner (label-facing) edge — centring the reel in its window reads as a
+   diagram, not a machine. Reel SVG is 165% of the window. */
+.win svg {
+  display: block; position: absolute; top: 48%;
+  width: 165%; height: auto; transform: translateY(-50%);
+}
+.win--l svg { left: 17.5%; }
+.win--r svg { left: -82.5%; }
+
+/* A tape that is playing is a tape that is moving. Only the hub + its
+   teeth spin — see spool()'s comment on why the wound-tape ring never
+   does — around the SVG's own centre, which in this 0-100 viewBox is
+   always (50,50) regardless of rendered size. duration/delay/play-state
+   are set inline per instance (app.js: reelAnimParams) since they differ
+   per reel and per play/pause state; name/timing/iteration-count are
+   shared, so they live here. */
+.reel-hub { transform-origin: 50px 50px; }
+.reel-hub--live {
+  animation-name: reel-spin;
+  animation-timing-function: linear;
+  animation-iteration-count: infinite;
+}
+@keyframes reel-spin { to { transform: rotate(360deg); } }
+@media (prefers-reduced-motion: reduce) {
+  /* Not slower — none. This must beat the inline animation-duration/delay
+     app.js sets per instance, which it does: an !important author rule
+     outranks a non-important inline style in the cascade. */
+  .reel-hub--live { animation: none !important; }
+}
+
+/* label: everything sized in cqw so the sticker scales with the shell —
+   fixed px type here is what makes the counter collide with the state row
+   once the tape gets wider than whatever size it was last tested at. */
+.lab {
+  position: absolute; left: 25%; width: 50%; top: 26%; height: 50%;
+  background: var(--label); border-radius: .4cqw; overflow: hidden;
+  display: flex; flex-direction: column;
+  box-shadow: 0 .2cqw .5cqw rgba(0,0,0,.45);
+}
+/* Restored per the approved reference (vhs-template.html) — a plain
+   colour stripe was a hole where the episode number used to be. Bumped
+   1.9cqw -> 2.6cqw: the original rendered 6.66px at this tape's width,
+   fine as decoration but not as the information it actually carries. */
+.lab-band {
+  flex: none; background: var(--hue); color: var(--hue-fg, #fff);
+  display: flex; align-items: center; padding: .9cqw 1.8cqw;
+  font-family: ui-monospace, Menlo, monospace; font-size: 2.6cqw;
+  letter-spacing: .14em; text-transform: uppercase;
+}
+
+.lab-in { flex: 1; display: flex; gap: 1.6cqw; padding: 1.5cqw 1.8cqw; min-width: 0; align-items: stretch; }
+.cover {
+  width: 9cqw; flex: none; border-radius: .3cqw; overflow: hidden;
+  background: var(--label-line); align-self: center; aspect-ratio: 2/3;
+}
+.cover img { width: 100%; height: 100%; object-fit: cover; display: block; }
+
+/* min-width:0 is what stops the text column shoving the counter off. */
+.lab-txt { min-width: 0; flex: 1; display: flex; flex-direction: column; justify-content: center; gap: .8cqw; }
+.mark {
+  max-height: 5.6cqw; max-width: 100%; width: auto; object-fit: contain;
+  display: block; align-self: flex-start;
+  filter: grayscale(1) contrast(1.4) brightness(.35);
+}
+.title {
+  font-size: 3.4cqw; font-weight: 700; line-height: 1.05; letter-spacing: -.01em;
+  color: var(--label-fg); white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+}
+/* Bumped 2.5cqw -> 2.6cqw: the original rendered 8.76px, a hair under the
+   9px floor — everything text-shaped on this label needs to clear it now. */
+.sub {
+  font-family: ui-monospace, Menlo, monospace; font-size: 2.6cqw; line-height: 1.3;
+  color: var(--label-dim); letter-spacing: .01em;
+  display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden;
+}
+/* Bumped 1.7cqw -> 2.6cqw: the original rendered 5.95px. .box is a plain
+   checkbox glyph, not text, so it's exempt from the 9px floor and stays
+   at its original size. */
+/* Full-width strip along the BOTTOM of the label, the way the
+   SP/LP · MONO/STEREO · NOISE REDUCTION row runs on a real cassette label.
+   It used to live inside .lab-txt, in an 82px column, where the text needed
+   110px and overflowed 28px straight across the counter. At the label's full
+   width it fits with room to spare — and the spare room is where the
+   handwritten name goes, so neither can collide with anything. */
+.state {
+  flex: none; display: flex; align-items: center; gap: 1cqw; min-width: 0;
+  padding: .5cqw 1.6cqw;
+  font-family: ui-monospace, Menlo, monospace; font-size: 2.6cqw; letter-spacing: .08em;
+  color: var(--label-dim); text-transform: uppercase;
+  border-top: 1px solid var(--label-line);
+}
+.chk { display: flex; align-items: center; gap: .45cqw; white-space: nowrap; }
+.box { width: 1.9cqw; height: 1.9cqw; border: 1px solid var(--label-dim); border-radius: .1cqw; flex: none; }
+.box.on { background: var(--label-fg); border-color: var(--label-fg); }
+
+/* the counter, in its own column so nothing can run into it */
+.left {
+  display: flex; flex-direction: column; align-items: flex-end; justify-content: center;
+  flex: none; padding-left: 1.4cqw; border-left: 1px solid var(--label-line);
+  font-family: ui-monospace, Menlo, monospace; line-height: 1;
+}
+.left-n { font-size: 5.4cqw; font-weight: 700; letter-spacing: -.03em; color: var(--label-fg); font-variant-numeric: tabular-nums; }
+/* Kept at the size this was fixed to (was 1.5cqw / 4.5px, genuinely too
+   small) rather than reverting — at the restored 70% width it now
+   renders comfortably over the 9px floor with room to spare. */
+.left-l { font-size: 3.2cqw; letter-spacing: .1em; color: var(--label-dim); line-height: 1.2; text-align: right; margin-top: .2cqw; }
+
+/* The watcher's name, written on the paper label like someone actually
+   grabbed a marker — not a UI element. Vendored Caveat (OFL, see
+   public/vendor/caveat.OFL.txt) is the closest thing this self-hosted
+   repo has to a real handwriting face; the fallback stack is whatever
+   cursive/handwriting face the OS already ships for anyone whose browser
+   hasn't loaded the woff2 yet (font-display:swap — see the @font-face
+   below). Off-axis on purpose: perfectly aligned would read as a UI
+   label, not a scrawled note. --ink is fixed across both colourways
+   (real marker ink doesn't change with the dashboard's theme) rather
+   than reusing --label-fg, which is themed (and, in riddim, dark green
+   rather than actually ink-coloured). pointer-events:none so it never
+   competes with the tape's own click target. */
+.hand-name {
+  /* Written on the bottom line of the label, right of the checkboxes — the
+     one genuinely empty patch of paper. It was absolutely positioned over
+     the printed colour band and the counter, i.e. on top of the printing
+     rather than on the paper. As a flex child it cannot collide with
+     anything: it simply takes what is left. */
+  margin-left: auto;
+  font-family: 'Caveat', 'Segoe Script', 'Bradley Hand', 'Comic Sans MS', cursive;
+  font-weight: 700; font-size: 4.6cqw; line-height: 1;
+  color: var(--ink); opacity: .9;
+  /* Rotating around the right edge means the far (left) corner swings
+     DOWN, not up, for this angle/direction — measured empirically at
+     ~1.5px past this row's own bottom edge, which sits flush against the
+     label's own bottom with no padding to absorb it. translateY (applied
+     before the rotation, so it shifts in screen space, not the rotated
+     one) nudges the whole thing up by exactly that measured amount rather
+     than fixed by guessing at the trig. */
+  transform: translateY(-2px) rotate(-4deg); transform-origin: right bottom;
+  white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+  max-width: 50%; text-transform: none;
+  pointer-events: none;
+}
+
+/* ── the slider, on Embla Carousel (see wireSliderDrag's replacement,
+   ensureSliderHost, in app.js). Embla positions .embla__container itself
+   via a transform on drag/scroll — .embla only needs overflow:hidden as
+   its viewport, and .embla__slide only needs the flex-basis that makes a
+   tape "one and a bit visible" at the widget's real width. ── */
+.vhs-slider-wrap { display: flex; flex-direction: column; gap: 6px; flex: 1; min-height: 0; }
+.embla { overflow: hidden; cursor: grab; }
+.embla:active { cursor: grabbing; }
+.embla__container { display: flex; gap: 11px; }
+/* Back to 70% (was briefly 60% for a 3-row footprint) — rowSpan is back
+   to 4 (see WIDGET_TYPES in app.js) to fit the full label restored above,
+   and 70% is what that footprint was measured for originally. */
+.embla__slide { flex: 0 0 70%; min-width: 0; }
+
+.dots { display: flex; gap: 5px; align-items: center; flex: none; }
+.dot {
+  width: 22px; height: 3px; border-radius: 2px; border: 0; padding: 0; cursor: pointer;
+  background: var(--key-ft); opacity: .3; transition: opacity .2s ease; flex: none;
+}
+.dot[aria-current="true"] { opacity: 1; }
+.dot:focus-visible { outline: 2px solid var(--alert); outline-offset: 2px; }
+
+/* ---------- buttons ---------- */
+
+.btn {
+  font-family: inherit;
+  text-transform: uppercase;
+  font-size: 10px;
+  letter-spacing: .1em;
+  background: var(--chip-bg);
+  border: none;
+  color: var(--chip-fg);
+  padding: 8px 12px;
+  cursor: pointer;
+}
+.btn:hover { background: var(--chip-dk-bg); color: var(--chip-dk-fg); }
+
+/* Vermilion is the failure colour on the main panel — the DOWN chip owns it
+   there. Primary buttons on transient surfaces (modal, search) may use it;
+   see .modal-form .btn-primary below. On the main panel, primary is dk. */
+.btn-primary {
+  background: var(--chip-dk-bg);
+  color: var(--chip-dk-fg);
+}
+.btn-primary:hover { opacity: .88; }
+
+.modal-form .btn-primary {
+  background: var(--alert);
+  color: var(--alert-fg);
+}
+.modal-form .btn-primary:hover { background: var(--alert); color: var(--alert-fg); opacity: .88; }
+
+.edit-actions {
+  display: flex;
+  gap: 8px;
+  margin-top: 16px;
+}
+
+/* ---------- search overlay ---------- */
+
+.search-overlay {
+  position: fixed;
+  inset: 0;
+  background: rgba(0, 0, 0, .75);
+  display: flex;
+  align-items: flex-start;
+  justify-content: center;
+  padding: 12vh 14px 0;
+  z-index: 50;
+}
+
+.search-box {
+  width: min(560px, 100%);
+  background: var(--plate-bg);
+  color: var(--plate-fg);
+}
+
+#search-input {
+  width: 100%;
+  background: var(--scr-bg);
+  color: var(--scr-fg);
+  border: none;
+  font-size: 15px;
+  padding: 14px;
+  caret-color: var(--scr-fg);
+}
+#search-input:focus { outline: none; }
+#search-input::placeholder { color: var(--scr-meta); }
+
+.search-results { max-height: 50vh; overflow-y: auto; }
+
+.search-row {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 10px 14px;
+  cursor: pointer;
+}
+.search-row:hover, .search-row.selected { background: var(--chip-bg); }
+
+.search-row .gl { margin-right: 2px; }
+
+.search-row .name {
+  font-family: "Helvetica Neue", Helvetica, Arial, sans-serif;
+  font-size: 13px;
+}
+
+.search-row .st-lab {
+  font-size: 8px;
+  letter-spacing: .1em;
+  text-transform: uppercase;
+  color: var(--desc);
+}
+
+.search-row .domain {
+  font-size: 10px;
+  color: var(--desc);
+  margin-left: auto;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.search-empty {
+  padding: 24px;
+  text-align: center;
+  color: var(--desc);
+  font-size: 11px;
+  text-transform: uppercase;
+  letter-spacing: .1em;
+}
+
+/* ---------- modal ---------- */
+
+.modal-scrim {
+  position: fixed;
+  inset: 0;
+  background: rgba(0, 0, 0, .75);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 60;
+  padding: 14px;
+}
+
+.modal {
+  width: min(460px, 100%);
+  background: var(--plate-bg);
+  color: var(--plate-fg);
+  padding: 16px;
+  max-height: 86vh;
+  overflow-y: auto;
+}
+
+.modal-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 14px;
+  gap: 10px;
+}
+
+.modal-title {
+  font-size: 10px;
+  letter-spacing: .16em;
+  text-transform: uppercase;
+  color: var(--plate-fg);
+}
+
+.modal-close {
+  background: none;
+  border: none;
+  color: var(--desc);
+  font-size: 20px;
+  cursor: pointer;
+  line-height: 1;
+  flex: none;
+}
+.modal-close:hover { color: var(--plate-fg); }
+
+.modal-error {
+  background: var(--alert);
+  color: var(--alert-fg);
+  font-size: 11px;
+  padding: 9px 10px;
+  margin-bottom: 14px;
+  overflow-wrap: anywhere;
+}
+
+.modal-form {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.modal-form label {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  font-size: 9px;
+  letter-spacing: .1em;
+  color: var(--desc);
+  text-transform: uppercase;
+}
+
+.modal-form input,
+.modal-form select {
+  background: var(--scr-bg);
+  color: var(--scr-fg);
+  border: none;
+  padding: 9px 10px;
+  font-size: 13px;
+  font-family: inherit;
+}
+.modal-form input:focus, .modal-form select:focus { outline: 2px solid var(--alert); outline-offset: 1px; }
+
+.modal-form button[type="submit"] { margin-top: 6px; }
+
+.form-note {
+  font-size: 10px;
+  color: var(--desc);
+}
+
+/* ---------- settings page ---------- */
+
+.settings-section {
+  background: var(--plate-bg);
+  color: var(--plate-fg);
+  padding: 13px 14px 15px;
+  margin-bottom: 9px;
+}
+
+.settings-section .section-head {
+  margin: 0 0 11px;
+  border-bottom-color: rgba(128, 128, 128, .25);
+}
+
+.section-note {
+  font-size: 8px;
+  letter-spacing: .1em;
+  text-transform: uppercase;
+  color: var(--desc);
+}
+
+.settings-grid {
+  display: grid;
+  grid-template-columns: repeat(2, 1fr);
+  gap: 11px 14px;
+}
+
+.settings-field {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  font-size: 9px;
+  letter-spacing: .1em;
+  color: var(--desc);
+  text-transform: uppercase;
+}
+
+.settings-field input {
+  background: var(--scr-bg);
+  color: var(--scr-fg);
+  border: none;
+  padding: 9px 10px;
+  font-size: 13px;
+  font-family: inherit;
+  text-transform: none;
+  letter-spacing: normal;
+}
+.settings-field input:focus { outline: 2px solid var(--alert); outline-offset: 1px; }
+.settings-field input::placeholder { color: var(--scr-meta); }
+
+.settings-field select {
+  background: var(--scr-bg);
+  color: var(--scr-fg);
+  border: none;
+  padding: 9px 10px;
+  font-size: 13px;
+  font-family: inherit;
+  text-transform: none;
+  letter-spacing: normal;
+}
+.settings-field select:focus { outline: 2px solid var(--alert); outline-offset: 1px; }
+.settings-field select:disabled { opacity: .5; }
+
+.field-help {
+  font-size: 8px;
+  letter-spacing: .04em;
+  text-transform: none;
+  color: var(--desc);
+  opacity: .85;
+}
+
+.field-help code, .key-help-body code {
+  font-size: .95em;
+  background: rgba(128, 128, 128, .16);
+  padding: 1px 4px;
+}
+
+/* Per-section "how do I get a key" disclosure — collapsed by default so it
+   never competes with the fields; native <details>, no JS. Spans the full
+   settings-grid width regardless of column count. */
+.key-help {
+  grid-column: 1 / -1;
+  border-top: 1px solid rgba(128, 128, 128, .25);
+  padding-top: 9px;
+  margin-top: 1px;
+}
+
+.key-help summary {
+  cursor: pointer;
+  font-size: 8px;
+  letter-spacing: .1em;
+  text-transform: uppercase;
+  color: var(--desc);
+  list-style: none;
+}
+.key-help summary::-webkit-details-marker { display: none; }
+.key-help summary::before {
+  content: '+ ';
+  display: inline-block;
+  width: 9px;
+}
+.key-help[open] summary::before { content: '– '; }
+.key-help summary:hover { color: var(--plate-fg); }
+
+.key-help-body {
+  margin-top: 9px;
+  font-size: 10px;
+  line-height: 1.55;
+  color: var(--desc);
+  text-transform: none;
+  letter-spacing: normal;
+  max-width: 64ch;
+}
+.key-help-body p { margin: 0 0 7px; }
+.key-help-body p:last-child { margin-bottom: 0; }
+.key-help-body ul, .key-help-body ol {
+  margin: 4px 0 7px 18px;
+  padding: 0;
+}
+.key-help-body li { margin-bottom: 3px; }
+.key-help-body li:last-child { margin-bottom: 0; }
+.key-help-body strong { color: inherit; font-weight: 600; }
+
+.test-result {
+  margin-top: 10px;
+  font-size: 9px;
+  letter-spacing: .05em;
+  color: var(--lab);
+}
+.test-result.test-ok { color: var(--plate-fg); }
+.test-result.test-fail { color: var(--alert); }
+
+/* ---------- reduced motion ---------- */
+
+@media (prefers-reduced-motion: reduce) {
+  * { animation: none !important; transition: none !important; }
+}
+
+/* ---------- responsive ---------- */
+
+@media (max-width: 760px) {
+  .pad { grid-template-columns: repeat(2, 1fr); }
+}
+
+@media (max-width: 620px) {
+  .settings-grid { grid-template-columns: 1fr; }
+}
+
+@media (max-width: 480px) {
+  .wrap { padding: 10px 10px 32px; }
+  .scr-glyphs { max-width: 100%; }
+  .scr-sys { grid-template-columns: repeat(2, 1fr); gap: 8px 12px; }
+  /* A long .section-note (e.g. JELLYFIN's) has no room beside its .lbl at
+     this width — drop it to its own line instead of overlapping the label. */
+  .section-head { flex-wrap: wrap; row-gap: 3px; }
+  .section-note { flex-basis: 100%; }
+}
+
+@media (max-width: 380px) {
+  .plate-model { font-size: 19px; }
+  .scr-big { font-size: 24px; }
+}
+
+/* ===========================================================================
+   WIDGET: TRUENAS — the placeable widget version of the retired #scr-sys
+   bar. Sits on the normal --key-bg card (not `bare`), so its rows read like
+   any other key content: a label + value line, same rhythm as .scr-sys-item
+   before it. `.tn-bad` is the ONLY colour path in this whole component —
+   applied to a single pool row or the alerts line, never to CPU/MEM/UP —
+   per house rule: saturated colour means a real problem, nothing else.
+   =========================================================================== */
+
+.tn-stats {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 10px;
+}
+
+.tn-stat {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.tn-stat-lab {
+  font-size: 7.5px;
+  letter-spacing: .14em;
+  text-transform: uppercase;
+  color: var(--key-ft);
+}
+
+.tn-stat-val {
+  font-size: 13px;
+  font-variant-numeric: tabular-nums;
+  color: var(--key-fg);
+}
+
+.tn-pools {
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+  /* "Every pool" is the whole point of the widget, but the card's footprint
+     is fixed — a NAS with far more pools than fit scrolls here instead of
+     silently clipping one, the only place in this widget that can grow. */
+  max-height: 62px;
+  overflow-y: auto;
+}
+
+.tn-pool {
+  display: flex;
+  align-items: baseline;
+  gap: 6px;
+  font-size: 9.5px;
+  letter-spacing: .02em;
+}
+
+.tn-pool-name {
+  color: var(--key-fg);
+  overflow: hidden;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+}
+
+.tn-pool-pct {
+  color: var(--key-ft);
+  font-variant-numeric: tabular-nums;
+  margin-left: auto;
+}
+
+.tn-pool-status {
+  color: var(--alert);
+  text-transform: uppercase;
+  font-size: 8px;
+  letter-spacing: .08em;
+}
+
+.tn-pool.tn-bad .tn-pool-name,
+.tn-pool.tn-bad .tn-pool-pct { color: var(--alert); }
+
+.tn-line {
+  font-size: 9px;
+  letter-spacing: .04em;
+  color: var(--key-ft);
+}
+
+.tn-alerts.tn-bad { color: var(--alert); }
+
+.tn-host {
+  margin-top: auto;
+  text-transform: uppercase;
+  font-size: 8px;
+  letter-spacing: .1em;
+  opacity: .8;
+}
