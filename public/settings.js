@@ -44,6 +44,11 @@ function setField(name, value) {
   if (el) el.value = value != null ? value : '';
 }
 
+function setCheck(name, value) {
+  const el = document.querySelector(`[name="${name}"]`);
+  if (el) el.checked = value === true;
+}
+
 // Key fields are never populated with the actual value — the server never
 // sends one. The hint (last 4 chars, or null) is shown as a helper string
 // next to the field, and as a placeholder, so the field visibly reads
@@ -77,6 +82,9 @@ function populateForm() {
 
   setField('truenas.url', truenas.url);
   applyKeyHint('truenas.apiKey', 'hint-truenas', truenas.apiKeyHint);
+
+  setCheck('truenas.fromBrowser', truenas.fromBrowser);
+  setCheck('jellyfin.fromBrowser', jellyfin.fromBrowser);
 
   setField('jellyfin.url', jellyfin.url);
   applyKeyHint('jellyfin.apiKey', 'hint-jellyfin', jellyfin.apiKeyHint);
@@ -169,10 +177,12 @@ function buildPayload(form) {
     },
     truenas: {
       url: get('truenas.url'),
+      fromBrowser: form.elements['truenas.fromBrowser'].checked,
     },
     jellyfin: {
       url: get('jellyfin.url'),
       userId: get('jellyfin.userId'),
+      fromBrowser: form.elements['jellyfin.fromBrowser'].checked,
     },
   };
 

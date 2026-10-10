@@ -95,6 +95,11 @@
           <input type="password" name="truenas.apiKey" autocomplete="off">
           <span class="field-help" id="hint-truenas"></span>
         </label>
+        <label class="settings-check">
+          <input type="checkbox" name="truenas.fromBrowser">
+          <span>CALL FROM BROWSER</span>
+        </label>
+        <p class="field-warn">Off: the server talks to TrueNAS. On: your browser does, so this works when only your devices (not the server) can reach TrueNAS, e.g. through a Pangolin client. The API key is then sent to <strong>every browser that opens this page</strong> — turn it on only behind a login (for example Pangolin SSO). Use a <strong>READONLY_ADMIN</strong> key.</p>
         <details class="key-help">
           <summary>HOW DO I GET A KEY?</summary>
           <div class="key-help-body">
@@ -123,6 +128,11 @@
           <input type="password" name="jellyfin.apiKey" autocomplete="off">
           <span class="field-help" id="hint-jellyfin"></span>
         </label>
+        <label class="settings-check">
+          <input type="checkbox" name="jellyfin.fromBrowser">
+          <span>CALL FROM BROWSER</span>
+        </label>
+        <p class="field-warn">Off: the server talks to Jellyfin. On: your browser does, so this works when only your devices (not the server) can reach Jellyfin, e.g. through a Pangolin client. The API key is then sent to <strong>every browser that opens this page</strong> — turn it on only behind a login (for example Pangolin SSO). Use an API token of a <strong>non-admin user</strong>. Jellyfin must also allow this page's origin (CORS).</p>
         <label class="settings-field">USER
           <select name="jellyfin.userId" id="jellyfin-user-select" disabled></select>
           <span class="field-help" id="jellyfin-user-help">Save a URL and API key, then reload this page to choose a user.</span>

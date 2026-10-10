@@ -28,8 +28,8 @@ function defaultSettings() {
   return {
     version: VERSION,
     pangolin: { apiUrl: '', orgId: '', apiKey: '' },
-    jellyfin: { url: '', apiKey: '', userId: '' },
-    truenas: { url: '', apiKey: '' },
+    jellyfin: { url: '', apiKey: '', userId: '', fromBrowser: false },
+    truenas: { url: '', apiKey: '', fromBrowser: false },
     branding: { model: 'PB-1', subtitle: 'サーバー' },
   };
 }
@@ -82,6 +82,13 @@ function validateApiKey(value, existing, label) {
   return value;
 }
 
+// Strict: "false" or 0 must not silently turn on a mode that hands the API
+// key to every browser. Only a real boolean passes.
+function validateBoolean(value, label) {
+  if (typeof value !== 'boolean') throw validationError(`${label} must be true or false.`);
+  return value;
+}
+
 function validateJellyfinUserId(value) {
   if (typeof value !== 'string') throw validationError('jellyfin.userId must be a string.');
   const trimmed = value.trim();
@@ -128,10 +135,18 @@ function mergeAndValidate(current, patch) {
   next.jellyfin.userId = validateJellyfinUserId(
     j.userId !== undefined ? j.userId : current.jellyfin.userId
   );
+  next.jellyfin.fromBrowser = validateBoolean(
+    j.fromBrowser !== undefined ? j.fromBrowser : current.jellyfin.fromBrowser,
+    'jellyfin.fromBrowser'
+  );
 
   const t = (patch && typeof patch === 'object' && patch.truenas) || {};
   next.truenas.url = validateUrlField(t.url !== undefined ? t.url : current.truenas.url, 'truenas.url');
   next.truenas.apiKey = validateApiKey(t.apiKey, current.truenas.apiKey, 'truenas.apiKey');
+  next.truenas.fromBrowser = validateBoolean(
+    t.fromBrowser !== undefined ? t.fromBrowser : current.truenas.fromBrowser,
+    'truenas.fromBrowser'
+  );
 
   const b = (patch && typeof patch === 'object' && patch.branding) || {};
   next.branding.model = validateModel(b.model !== undefined ? b.model : current.branding.model);
@@ -230,10 +245,12 @@ function toPublicView(settings) {
       url: settings.jellyfin.url,
       apiKeyHint: hintFor(settings.jellyfin.apiKey),
       userId: settings.jellyfin.userId,
+      fromBrowser: settings.jellyfin.fromBrowser,
     },
     truenas: {
       url: settings.truenas.url,
       apiKeyHint: hintFor(settings.truenas.apiKey),
+      fromBrowser: settings.truenas.fromBrowser,
     },
     branding: {
       model: settings.branding.model,
@@ -257,6 +274,21 @@ async function configured() {
   return isConfigured(settings);
 }
 
+// The ONE place a raw key may leave the server for a browser: only for
+// services whose "Call from browser" flag is on. Everything else stays
+// server-side. Returns {} when no service opted in.
+async function browserCredentials() {
+  const s = await load();
+  const out = {};
+  if (s.jellyfin.fromBrowser) {
+    out.jellyfin = { url: s.jellyfin.url, apiKey: s.jellyfin.apiKey, userId: s.jellyfin.userId };
+  }
+  if (s.truenas.fromBrowser) {
+    out.truenas = { url: s.truenas.url, apiKey: s.truenas.apiKey };
+  }
+  return out;
+}
+
 module.exports = {
   DATA_DIR,
   SETTINGS_FILE,
@@ -264,4 +296,5 @@ module.exports = {
   save,
   publicView,
   configured,
+  browserCredentials,
 };

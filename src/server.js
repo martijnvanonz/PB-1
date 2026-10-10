@@ -98,6 +98,11 @@ const CREDENTIAL_PAIRS = [
   { service: 'truenas', urlField: 'url', keyField: 'apiKey', label: 'TrueNAS URL' },
 ];
 
+// The rule looks only at the URL and the key, never at fromBrowser: pointing
+// a service at a new host while keeping the old key is rejected whether or
+// not the same request also flips "Call from browser" — flipping it would
+// otherwise hand the old key to the browser for the new host.
+//
 // Returns an error message string if `patch` would leak a credential,
 // otherwise null. `current` is the currently-saved settings object.
 function findCredentialExfilRisk(current, patch) {
@@ -227,6 +232,14 @@ async function handleState(req, res, query) {
   sendJson(res, 200, { pangolin: pg, jellyfin: jf, layout, settings: settingsView });
 }
 
+// Raw keys for the services that opted into "Call from browser", so the page
+// can call them itself. no-store: a key must never sit in a shared cache.
+async function handleBrowserCredentials(req, res) {
+  const payload = JSON.stringify(await settings.browserCredentials());
+  res.writeHead(200, { 'Content-Type': 'application/json; charset=utf-8', 'Cache-Control': 'no-store' });
+  res.end(payload);
+}
+
 async function handleSaveLayout(req, res) {
   const body = await readJsonBody(req, 200 * 1024);
   const saved = await store.saveLayout(body);
@@ -347,6 +360,7 @@ async function dispatch(req, res, url) {
   if (req.method === 'GET' && pathname === '/api/settings') return handleGetSettings(req, res);
   if (req.method === 'PUT' && pathname === '/api/settings') return handlePutSettings(req, res);
   if (req.method === 'POST' && pathname === '/api/settings/test') return handleTestSettings(req, res);
+  if (req.method === 'GET' && pathname === '/api/browser-credentials') return handleBrowserCredentials(req, res);
   if (req.method === 'GET' && pathname === '/api/icon') return handleIcon(req, res, searchParams);
   if (req.method === 'GET' && pathname === '/api/jellyfin/resume') return handleJellyfinResume(req, res);
   if (req.method === 'GET' && pathname === '/api/jellyfin/nextup') return handleJellyfinNextUp(req, res);

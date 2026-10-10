@@ -304,12 +304,15 @@ folders on your NAS — a dataset snapshot, `rsync`, whatever you use.
 TrueNAS SCALE 24.10 and newer run apps with Docker Compose, so the image
 installs as a custom app:
 
-1. Create a dataset for the data, e.g. `/mnt/<pool>/apps/patchbay`, then
-   in **System → Shell** hand it to uid 1000:
-
-   ```bash
-   chown 1000:1000 /mnt/<pool>/apps/patchbay
-   ```
+1. Create a dataset for the data, e.g. `/mnt/<pool>/apps/patchbay`.
+   TrueNAS runs apps as the built-in `apps` user (uid/gid 568), so use
+   `568:568` below, not 1000. Datasets made under the **Appdata** preset
+   normally already give `apps` modify rights through an NFS4 ACL, so you
+   usually need **no** `chown` at all. Only if the app later logs that it
+   cannot write to its data directory, check the dataset's permissions
+   (**Datasets → Permissions**) and give the `apps` user and group modify
+   access. Do not `chown 1000:1000` here: it replaces the ACL and locks
+   the `apps` user out.
 
 2. **Apps → Discover Apps → ⋮ → Install via YAML**, name it `patchbay`,
    and paste this. The `./data` relative path from `docker-compose.yml`
@@ -319,7 +322,7 @@ installs as a custom app:
    services:
      patchbay:
        image: ghcr.io/martijnvanonz/pb-1:latest
-       user: "1000:1000"
+       user: "568:568"
        ports:
          - "8288:8288"
        volumes:
@@ -336,6 +339,32 @@ installs as a custom app:
 To update after a new push to `main`, use **Update** on the app (or
 stop and start it with "pull image" checked) so TrueNAS fetches the new
 `:latest`.
+
+### Calling Jellyfin and TrueNAS from the browser
+
+By default the server calls Jellyfin and TrueNAS itself. That fails when
+the app runs where those hosts are only reachable through a client-side
+tunnel: for example a container on the NAS with no Pangolin client, whose
+calls leave through public DNS and get Pangolin's HTML login page back
+(`Unexpected token '<'` for Jellyfin, "Cannot reach TrueNAS"). Your
+browser, which does run the Pangolin client, can reach them.
+
+For that case, each of the two settings sections has an opt-in
+**Call from browser** checkbox (off by default). When it is on, the page
+loads the URL and API key from `/api/browser-credentials` once per page
+load and calls the service directly. The widgets look the same; the
+server endpoints stay in place for when the box is off.
+
+**Security trade-off:** with the box on, the API key is sent to every
+browser that opens the page. Patchbay has no login of its own, so use
+this only behind a login (for example Pangolin SSO), and use the least
+privileged key you can: for Jellyfin an API token of a **non-admin
+user**, for TrueNAS a **READONLY_ADMIN** key. Only services with the box
+on are included in `/api/browser-credentials`; with both off it returns
+`{}`. Jellyfin must also answer CORS requests for the page's origin with
+the `Authorization` header allowed. TrueNAS must accept a WebSocket from
+that origin. If the page is served over `https`, the service URLs must be
+`https` too.
 
 ### Security
 

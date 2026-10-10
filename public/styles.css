@@ -1211,6 +1211,33 @@ button.chip { cursor: pointer; }
 .key-help-body li:last-child { margin-bottom: 0; }
 .key-help-body strong { color: inherit; font-weight: 600; }
 
+/* "Call from browser" opt-in: a checkbox row plus the warning it carries.
+   Both span the full settings-grid width. The warning reuses --alert, the
+   app's one "pay attention" colour, since this one hands a key to browsers. */
+.settings-check {
+  grid-column: 1 / -1;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 9px;
+  letter-spacing: .1em;
+  color: var(--desc);
+  cursor: pointer;
+}
+.settings-check input { accent-color: var(--alert); margin: 0; }
+
+.field-warn {
+  grid-column: 1 / -1;
+  margin: -4px 0 0;
+  padding-left: 9px;
+  border-left: 2px solid var(--alert);
+  font-size: 10px;
+  line-height: 1.55;
+  color: var(--desc);
+  max-width: 64ch;
+}
+.field-warn strong { color: inherit; font-weight: 600; }
+
 .test-result {
   margin-top: 10px;
   font-size: 9px;
