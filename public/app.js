@@ -21,9 +21,6 @@ const THEMES = ['ko', 'riddim'];
 //              space and tiles below overlap or leave a hole.
 //   maxItems — rows of content shown, capped to what that footprint fits.
 //   endpoint — GET url returning { ok, items, error }.
-//   browserLoad — same result from the browser, used instead of `endpoint`
-//              when that service has "Call from browser" on (see
-//              loadFromBrowser). Optional; Jellyfin widgets only.
 //   showProgress — whether rows render a progress bar/figure at all.
 //   paint    — (bodyEl, data, def) => void, patches one instance in place.
 // Adding a second widget type is one entry here (reusing paintJellyfinSlider
@@ -42,7 +39,6 @@ const WIDGET_TYPES = {
     rowSpan: 4,
     maxItems: 10,
     endpoint: '/api/jellyfin/resume',
-    browserLoad: (creds) => PatchbayJellyfin.loadItems('resume', creds),
     showProgress: true,
     emptyText: 'Nothing to resume.',
     paint: paintJellyfinSlider,
@@ -54,7 +50,6 @@ const WIDGET_TYPES = {
     rowSpan: 4,
     maxItems: 10,
     endpoint: '/api/jellyfin/nextup',
-    browserLoad: (creds) => PatchbayJellyfin.loadItems('nextup', creds),
     showProgress: false,
     emptyText: 'Nothing up next.',
     paint: paintJellyfinSlider,
@@ -73,7 +68,6 @@ const WIDGET_TYPES = {
     rowSpan: 4,
     maxItems: 10,
     endpoint: '/api/jellyfin/nowplaying',
-    browserLoad: (creds) => PatchbayJellyfin.loadNowPlaying(creds),
     showProgress: true,
     emptyText: 'Nothing playing.',
     paint: paintJellyfinSlider,
@@ -113,24 +107,6 @@ async function fetchState(force) {
   const res = await fetch(url);
   if (!res.ok) throw new Error(`Failed to load state: ${res.status}`);
   STATE = await res.json();
-}
-
-// "Call from browser": a service whose settings say fromBrowser is called
-// by this page itself instead of through the server, because the server (in
-// a container without the Pangolin client) cannot reach it but this browser
-// can. The raw credentials are fetched once per page load and kept only in
-// memory; null means "use the server endpoint" (flag off, or no credentials).
-let BROWSER_CREDENTIALS = null;
-
-async function browserCredentialsFor(service) {
-  const flagged = STATE && STATE.settings && STATE.settings[service] && STATE.settings[service].fromBrowser;
-  if (!flagged) return null;
-  if (!BROWSER_CREDENTIALS) {
-    BROWSER_CREDENTIALS = fetch('/api/browser-credentials', { cache: 'no-store' })
-      .then((res) => (res.ok ? res.json() : {}))
-      .catch(() => ({}));
-  }
-  return (await BROWSER_CREDENTIALS)[service] || null;
 }
 
 async function saveLayout() {
@@ -599,22 +575,14 @@ function truenasPoolIsBad(pool) {
   return Boolean(pool) && (pool.healthy === false || (pool.status && pool.status !== 'ONLINE'));
 }
 
-// Same body shape either way: from the server's /api/truenas, or — when
-// TrueNAS has "Call from browser" on — straight from this browser.
-async function fetchTruenasBody() {
-  const creds = await browserCredentialsFor('truenas');
-  if (creds) return PatchbayTruenas.loadSnapshot(creds);
-  const res = await fetch('/api/truenas');
-  return res.json();
-}
-
 // Fetched on the app's existing 20s refresh cycle (see boot() below) — no
 // second timer. Patches every mounted `truenas` widget instance in place
 // via updateWidgetInstances, the same mechanism every other widget type
 // uses; never rebuilds one.
 async function fetchTruenasData() {
   try {
-    const body = await fetchTruenasBody();
+    const res = await fetch('/api/truenas');
+    const body = await res.json();
     TRUENAS_DATA = { loaded: true, ...body };
   } catch (e) {
     TRUENAS_DATA = { loaded: true, ok: false, error: 'Could not reach the server.' };
@@ -1511,18 +1479,12 @@ function updateWidgetInstances(widgetType) {
   }
 }
 
-async function fetchWidgetBody(def) {
-  const creds = def.browserLoad ? await browserCredentialsFor('jellyfin') : null;
-  if (creds) return def.browserLoad(creds);
-  const res = await fetch(def.endpoint);
-  return res.json();
-}
-
 async function fetchWidgetData(widgetType) {
   const def = WIDGET_TYPES[widgetType];
   if (!def || !def.endpoint) return;
   try {
-    const body = await fetchWidgetBody(def);
+    const res = await fetch(def.endpoint);
+    const body = await res.json();
     WIDGET_DATA[widgetType] = { loaded: true, ok: Boolean(body.ok), items: body.items || [], error: body.error || null };
   } catch (e) {
     WIDGET_DATA[widgetType] = { loaded: true, ok: false, items: [], error: 'Could not reach the server.' };

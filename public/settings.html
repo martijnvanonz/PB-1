@@ -84,22 +84,21 @@
     <section class="settings-section">
       <div class="section-head">
         <span class="lbl">TRUENAS</span>
-        <span class="section-note">NOT USED YET</span>
+        <button class="section-btn" type="button" id="test-truenas">TEST</button>
       </div>
       <div class="settings-grid">
         <label class="settings-field">URL
-          <input type="url" name="truenas.url" placeholder="http://localhost or https://nas.example.com" autocomplete="off">
-          <span class="field-help">Running on the NAS itself? Use <code>http://localhost</code>. Running elsewhere? The LAN address or the public hostname both work.</span>
+          <input type="url" name="truenas.url" placeholder="https://192.0.2.10" autocomplete="off">
+          <span class="field-help">Use the NAS's <strong>internal LAN address</strong> with <code>https://</code>. TrueNAS revokes an API key that is used over plain HTTP, so <code>http://</code> is refused.</span>
+        </label>
+        <label class="settings-field">CERTIFICATE FINGERPRINT (SHA-256)
+          <input type="text" name="truenas.certFingerprint" placeholder="AA:BB:CC:…" autocomplete="off" spellcheck="false">
+          <span class="field-help">Needed when TrueNAS uses a self-signed certificate. Leave blank if it has a certificate your server trusts. Press TEST to see the fingerprint TrueNAS presents.</span>
         </label>
         <label class="settings-field">API KEY
           <input type="password" name="truenas.apiKey" autocomplete="off">
           <span class="field-help" id="hint-truenas"></span>
         </label>
-        <label class="settings-check">
-          <input type="checkbox" name="truenas.fromBrowser">
-          <span>CALL FROM BROWSER</span>
-        </label>
-        <p class="field-warn">Off: the server talks to TrueNAS. On: your browser does, so this works when only your devices (not the server) can reach TrueNAS, e.g. through a Pangolin client. The API key is then sent to <strong>every browser that opens this page</strong> — turn it on only behind a login (for example Pangolin SSO). Use a <strong>READONLY_ADMIN</strong> key.</p>
         <details class="key-help">
           <summary>HOW DO I GET A KEY?</summary>
           <div class="key-help-body">
@@ -113,6 +112,8 @@
           </div>
         </details>
       </div>
+      <div class="test-result" id="test-result-truenas" hidden></div>
+      <button class="section-btn" type="button" id="trust-truenas-cert" hidden>TRUST THIS CERTIFICATE</button>
     </section>
 
     <section class="settings-section">
@@ -122,17 +123,13 @@
       </div>
       <div class="settings-grid">
         <label class="settings-field">URL
-          <input type="url" name="jellyfin.url" placeholder="https://jellyfin.example.com" autocomplete="off">
+          <input type="url" name="jellyfin.url" placeholder="http://192.0.2.10:8096" autocomplete="off">
+          <span class="field-help">Use the internal LAN address the server can reach. Posters are fetched by the server; the API key never reaches the browser.</span>
         </label>
         <label class="settings-field">API KEY
           <input type="password" name="jellyfin.apiKey" autocomplete="off">
           <span class="field-help" id="hint-jellyfin"></span>
         </label>
-        <label class="settings-check">
-          <input type="checkbox" name="jellyfin.fromBrowser">
-          <span>CALL FROM BROWSER</span>
-        </label>
-        <p class="field-warn">Off: the server talks to Jellyfin. On: your browser does, so this works when only your devices (not the server) can reach Jellyfin, e.g. through a Pangolin client. The API key is then sent to <strong>every browser that opens this page</strong> — turn it on only behind a login (for example Pangolin SSO). Use an API token of a <strong>non-admin user</strong>. Jellyfin must also allow this page's origin (CORS).</p>
         <label class="settings-field">USER
           <select name="jellyfin.userId" id="jellyfin-user-select" disabled></select>
           <span class="field-help" id="jellyfin-user-help">Save a URL and API key, then reload this page to choose a user.</span>

@@ -81,6 +81,13 @@ function normalizeUrlForCompare(value) {
   return value.trim().replace(/\/+$/, '');
 }
 
+// URLs compare as normalizeUrlForCompare; the certificate fingerprint
+// compares trimmed and case-insensitively (it is stored upper-case).
+function normalizeDestForCompare(field, value) {
+  if (field === 'certFingerprint') return typeof value === 'string' ? value.trim().toUpperCase() : value;
+  return normalizeUrlForCompare(value);
+}
+
 // An omitted, null, or empty-string credential means "keep the existing
 // one" (see settings.js validateApiKey) — this mirrors that definition.
 function isCredentialOmitted(value) {
@@ -93,15 +100,14 @@ function isCredentialOmitted(value) {
 // host now sits behind that URL. Reject that combination; require the
 // caller to re-supply the credential in the same request instead.
 const CREDENTIAL_PAIRS = [
-  { service: 'pangolin', urlField: 'apiUrl', keyField: 'apiKey', label: 'pangolin API URL' },
-  { service: 'jellyfin', urlField: 'url', keyField: 'apiKey', label: 'Jellyfin URL' },
-  { service: 'truenas', urlField: 'url', keyField: 'apiKey', label: 'TrueNAS URL' },
+  { service: 'pangolin', destFields: ['apiUrl'], keyField: 'apiKey', label: 'pangolin API URL' },
+  { service: 'jellyfin', destFields: ['url'], keyField: 'apiKey', label: 'Jellyfin URL' },
+  { service: 'truenas', destFields: ['url', 'certFingerprint'], keyField: 'apiKey', label: 'TrueNAS URL or certificate fingerprint' },
 ];
 
-// The rule looks only at the URL and the key, never at fromBrowser: pointing
-// a service at a new host while keeping the old key is rejected whether or
-// not the same request also flips "Call from browser" — flipping it would
-// otherwise hand the old key to the browser for the new host.
+// The TrueNAS certificate fingerprint counts as part of the destination: a
+// pin decides which certificate the key is sent to, so changing it while
+// keeping the old key is rejected like a URL change.
 //
 // Returns an error message string if `patch` would leak a credential,
 // otherwise null. `current` is the currently-saved settings object.
@@ -112,12 +118,12 @@ function findCredentialExfilRisk(current, patch) {
     const patchService = patch[pair.service];
     if (!patchService || typeof patchService !== 'object') continue;
 
-    const newUrl = patchService[pair.urlField];
-    if (newUrl === undefined) continue; // URL not part of this patch at all
-
-    const urlChanged =
-      normalizeUrlForCompare(newUrl) !== normalizeUrlForCompare(currentService[pair.urlField]);
-    if (!urlChanged) continue;
+    const destChanged = pair.destFields.some((field) => {
+      const newValue = patchService[field];
+      if (newValue === undefined) return false; // not part of this patch at all
+      return normalizeDestForCompare(field, newValue) !== normalizeDestForCompare(field, currentService[field]);
+    });
+    if (!destChanged) continue;
 
     const newKey = patchService[pair.keyField];
     const keyOmitted = isCredentialOmitted(newKey);
@@ -232,14 +238,6 @@ async function handleState(req, res, query) {
   sendJson(res, 200, { pangolin: pg, jellyfin: jf, layout, settings: settingsView });
 }
 
-// Raw keys for the services that opted into "Call from browser", so the page
-// can call them itself. no-store: a key must never sit in a shared cache.
-async function handleBrowserCredentials(req, res) {
-  const payload = JSON.stringify(await settings.browserCredentials());
-  res.writeHead(200, { 'Content-Type': 'application/json; charset=utf-8', 'Cache-Control': 'no-store' });
-  res.end(payload);
-}
-
 async function handleSaveLayout(req, res) {
   const body = await readJsonBody(req, 200 * 1024);
   const saved = await store.saveLayout(body);
@@ -277,10 +275,12 @@ async function handleTestSettings(req, res) {
 // Icon DISCOVERY, keyed strictly by resource key — never a user-supplied
 // URL. The key must exist in the current Pangolin snapshot; the server
 // derives the fetch target itself, so no request-controlled URL ever
-// reaches fetch(). The server only finds where the icon is — it never
-// fetches or stores image bytes; the browser fetches the actual image
+// reaches fetch(). For icons the server only finds where the icon is — it
+// never fetches or stores image bytes; the browser fetches the actual image
 // (often via Pangolin's own magic DNS), which also gets it real HTTP
-// caching for free. Returns { url } — a real URL on success, null when
+// caching for free. (Jellyfin posters are the one exception: see
+// handleJellyfinImage, which does fetch bytes, but only from the configured
+// Jellyfin URL.) Returns { url } — a real URL on success, null when
 // nothing was discoverable. Failures are quiet: a 404/null url here just
 // means the frontend falls back to the monogram, not an error state.
 //
@@ -341,6 +341,26 @@ async function handleJellyfinNowPlaying(req, res) {
   sendJson(res, 200, result);
 }
 
+// Poster/logo bytes from Jellyfin, fetched server-side (see jellyfin.image):
+// the browser only ever sees this same-origin URL.
+async function handleJellyfinImage(req, res, query) {
+  const result = await jellyfin.image({
+    id: query.get('id'),
+    type: query.get('type'),
+    maxWidth: query.get('maxWidth'),
+  });
+  if (result.status !== 200) return sendJson(res, result.status, { error: result.error });
+  res.writeHead(200, {
+    'Content-Type': result.contentType,
+    'Content-Length': result.body.length,
+    'Cache-Control': 'public, max-age=86400',
+    // An image/svg+xml answer must never run script on this origin.
+    'Content-Security-Policy': "default-src 'none'; sandbox",
+    'X-Content-Type-Options': 'nosniff',
+  });
+  res.end(result.body);
+}
+
 async function handleJellyfinUsers(req, res) {
   const result = await jellyfin.listUsers();
   sendJson(res, 200, result);
@@ -360,11 +380,11 @@ async function dispatch(req, res, url) {
   if (req.method === 'GET' && pathname === '/api/settings') return handleGetSettings(req, res);
   if (req.method === 'PUT' && pathname === '/api/settings') return handlePutSettings(req, res);
   if (req.method === 'POST' && pathname === '/api/settings/test') return handleTestSettings(req, res);
-  if (req.method === 'GET' && pathname === '/api/browser-credentials') return handleBrowserCredentials(req, res);
   if (req.method === 'GET' && pathname === '/api/icon') return handleIcon(req, res, searchParams);
   if (req.method === 'GET' && pathname === '/api/jellyfin/resume') return handleJellyfinResume(req, res);
   if (req.method === 'GET' && pathname === '/api/jellyfin/nextup') return handleJellyfinNextUp(req, res);
   if (req.method === 'GET' && pathname === '/api/jellyfin/nowplaying') return handleJellyfinNowPlaying(req, res);
+  if (req.method === 'GET' && pathname === '/api/jellyfin/image') return handleJellyfinImage(req, res, searchParams);
   if (req.method === 'GET' && pathname === '/api/jellyfin/users') return handleJellyfinUsers(req, res);
   if (req.method === 'GET' && pathname === '/api/truenas') return handleTruenas(req, res);
   if (req.method === 'GET' && pathname === '/favicon.ico') return handleFavicon(req, res);

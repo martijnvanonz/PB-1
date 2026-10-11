@@ -8,11 +8,9 @@ uptime pings, optional TrueNAS telemetry (CPU, memory, pool, uptime), and
 optional Jellyfin widgets (continue watching, up next, now playing).
 
 Node 20+, zero npm dependencies (only Node built-ins and global `fetch`),
-vanilla JS/HTML/CSS on the frontend, no build step. Everything runs on
-Node 20+; the TrueNAS telemetry widget needs Node 22+ (it uses the
-built-in `WebSocket` global, which Node 20 doesn't have) — on Node 20 that
-one widget shows a clean "needs Node 22 or newer" message instead of data,
-and the rest of the app is unaffected.
+vanilla JS/HTML/CSS on the frontend, no build step. TrueNAS telemetry uses
+a small WebSocket client built on `node:tls` (no global `WebSocket`
+needed), so it also runs on Node 20.
 
 **Uptime is checked entirely by your browser. Favicons split the work: the
 server DISCOVERS where the icon is, by reading each service's own HTML, and
@@ -83,7 +81,7 @@ target itself; a request-supplied URL never reaches `fetch()`.
   to the service's monogram.
 - Widgets you place on the grid yourself: Jellyfin continue watching and
   up next (a slider of VHS cassettes), Jellyfin now playing (hidden when
-  nothing plays), and TrueNAS telemetry (needs Node 22+, see above).
+  nothing plays), and TrueNAS telemetry.
 - "Add link" flow for manual links (anything outside Pangolin). The
   dashboard never writes to Pangolin — new Pangolin resources are added in
   the Pangolin UI and show up here automatically on the next sync.
@@ -340,31 +338,36 @@ To update after a new push to `main`, use **Update** on the app (or
 stop and start it with "pull image" checked) so TrueNAS fetches the new
 `:latest`.
 
-### Calling Jellyfin and TrueNAS from the browser
+### Pointing Patchbay at Jellyfin and TrueNAS
 
-By default the server calls Jellyfin and TrueNAS itself. That fails when
-the app runs where those hosts are only reachable through a client-side
-tunnel: for example a container on the NAS with no Pangolin client, whose
-calls leave through public DNS and get Pangolin's HTML login page back
-(`Unexpected token '<'` for Jellyfin, "Cannot reach TrueNAS"). Your
-browser, which does run the Pangolin client, can reach them.
+The server, not your browser, calls Jellyfin and TrueNAS. A container
+that runs on the NAS reaches them best on their **internal LAN
+addresses**; the public Pangolin hostnames answer a container without a
+Pangolin client with a login page. API keys stay on the server and are
+never sent to the browser.
 
-For that case, each of the two settings sections has an opt-in
-**Call from browser** checkbox (off by default). When it is on, the page
-loads the URL and API key from `/api/browser-credentials` once per page
-load and calls the service directly. The widgets look the same; the
-server endpoints stay in place for when the box is off.
-
-**Security trade-off:** with the box on, the API key is sent to every
-browser that opens the page. Patchbay has no login of its own, so use
-this only behind a login (for example Pangolin SSO), and use the least
-privileged key you can: for Jellyfin an API token of a **non-admin
-user**, for TrueNAS a **READONLY_ADMIN** key. Only services with the box
-on are included in `/api/browser-credentials`; with both off it returns
-`{}`. Jellyfin must also answer CORS requests for the page's origin with
-the `Authorization` header allowed. TrueNAS must accept a WebSocket from
-that origin. If the page is served over `https`, the service URLs must be
-`https` too.
+- **Jellyfin URL**: the internal address, e.g. `http://192.0.2.10:8096`.
+  Posters and logos are fetched by the server and served from
+  `/api/jellyfin/image`, so the browser never needs to reach that
+  address. The click-through link on each cassette uses the public URL of
+  the Pangolin resource that targets the same host and port; with no
+  matching resource it falls back to the Jellyfin URL you entered. The
+  match uses the same internal address as icon discovery, so a Newt that
+  reports `127.0.0.1` needs `INTERNAL_HOST` (or `network_mode: host`);
+  see "Private-resource icon discovery".
+- **TrueNAS URL**: the internal address with `https://`, e.g.
+  `https://192.0.2.10`. `http://` is refused: TrueNAS 25.04 and newer
+  revoke an API key that is used over a plain `http`/`ws` connection.
+- **Certificate fingerprint**: TrueNAS serves a self-signed certificate
+  on its LAN address. Press **TEST** on the settings page: when the
+  certificate is not trusted, Patchbay shows the SHA-256 fingerprint
+  TrueNAS presents (it sends no API key to find out). Compare it with
+  the certificate in TrueNAS, press **Trust this certificate**, then
+  **Save**. From then on Patchbay connects only to a server that presents
+  that exact certificate; any other certificate is dropped before the key
+  is sent. Leave the field blank if TrueNAS has a certificate your
+  server already trusts. Changing the URL or the fingerprint requires
+  re-entering the API key.
 
 ### Security
 
@@ -437,7 +440,7 @@ described above (unrelated to the settings seed):
 
 | Variable        | Meaning                                                        | Default |
 |-----------------|-----------------------------------------------------------------|---------|
-| `INTERNAL_HOST` | LAN address to substitute for `127.0.0.1` when reaching a private resource's internal address for icon discovery. | (unset) |
+| `INTERNAL_HOST` | LAN address to substitute for `127.0.0.1` when reaching a private resource's internal address for icon discovery, and when matching the Jellyfin URL to its public Pangolin hostname. | (unset) |
 
 ## Data on disk
 

@@ -149,4 +149,33 @@ function rebaseOntoPublic(discoveredUrl, resource) {
   }
 }
 
-module.exports = { candidateBaseUrls, parseIconLinks, pickBestIcon, discoverIconUrl, discoverIconDetailed, rebaseOntoPublic };
+function effectivePort(u) {
+  return Number(u.port) || (u.protocol === 'https:' ? 443 : 80);
+}
+
+// The Pangolin resource whose internal target is the same host:port as
+// `internalUrl` (e.g. the Jellyfin URL the server calls), or null. Uses the
+// same internal address candidateBaseUrls builds, so the INTERNAL_HOST
+// loopback substitution applies here too. Resources without a public URL
+// are skipped: they cannot serve as a browser-reachable address.
+function findPublicResource(internalUrl, resources) {
+  let target;
+  try {
+    target = new URL(internalUrl);
+  } catch {
+    return null;
+  }
+  for (const resource of Array.isArray(resources) ? resources : []) {
+    if (!resource.url || !resource.destination || !resource.destinationPort) continue;
+    let internal;
+    try {
+      internal = new URL(candidateBaseUrls(resource)[0]);
+    } catch {
+      continue;
+    }
+    if (internal.hostname === target.hostname && effectivePort(internal) === effectivePort(target)) return resource;
+  }
+  return null;
+}
+
+module.exports = { findPublicResource, candidateBaseUrls, parseIconLinks, pickBestIcon, discoverIconUrl, discoverIconDetailed, rebaseOntoPublic };

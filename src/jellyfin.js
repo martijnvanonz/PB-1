@@ -4,12 +4,17 @@
 // at module load — so a settings change takes effect on the next call.
 //
 // The pure logic (formatting, BlurHash colours, request paths, session
-// mapping) lives in public/shared/jellyfin-core.js so the browser can run
-// the exact same code when "Call from browser" is on. This file only adds
-// settings lookup and the server-side caches.
+// mapping) lives in src/jellyfin-core.js. This file adds settings lookup,
+// the server-side caches, the public click-through link and the image proxy.
+//
+// The configured URL is an INTERNAL address the server calls. The browser
+// never sees it, and never sees the API key: posters and logos are fetched
+// through image(), and cassette links are rebased onto a public hostname.
 
 const settings = require('./settings');
-const core = require('../public/shared/jellyfin-core');
+const core = require('./jellyfin-core');
+const pangolin = require('./pangolin');
+const icons = require('./icons');
 
 const CACHE_MS = 30 * 1000;
 
@@ -60,6 +65,22 @@ async function cached(cacheRef, force, ttl, load) {
   return data;
 }
 
+// Base URL for the cassette click-through links: the public URL of the
+// Pangolin resource that targets the same host:port as the configured
+// (internal) Jellyfin URL, so the link opens from outside the house. Falls
+// back to the configured URL when Pangolin is off, unreachable or has no
+// matching resource — a failed lookup must never fail the widget.
+async function publicLinkBase(urlBase) {
+  try {
+    const snap = await pangolin.snapshot(false);
+    const resource = icons.findPublicResource(urlBase, snap && snap.resources);
+    if (resource) return core.trimBase(icons.rebaseOntoPublic(urlBase, resource));
+  } catch {
+    /* fall through to the configured URL */
+  }
+  return urlBase;
+}
+
 async function configured() {
   const s = await settings.load();
   return Boolean(s.jellyfin.url && s.jellyfin.apiKey);
@@ -80,7 +101,9 @@ async function fetchItemWidget(cacheRef, force, kind) {
   if (!core.trimBase(creds.url) || !creds.apiKey || !(creds.userId || '').trim()) {
     return core.loadItems(kind, creds);
   }
-  return cached(cacheRef, force, CACHE_MS, () => core.loadItems(kind, creds, getServerId));
+  return cached(cacheRef, force, CACHE_MS, async () =>
+    core.loadItems(kind, { ...creds, linkBase: await publicLinkBase(core.trimBase(creds.url)) }, getServerId)
+  );
 }
 
 // Continue-watching data for the "jump into your next episode" widget.
@@ -105,7 +128,9 @@ async function nowPlaying(force = false) {
   const s = await settings.load();
   const creds = { url: s.jellyfin.url, apiKey: s.jellyfin.apiKey };
   if (!core.trimBase(creds.url) || !creds.apiKey) return core.loadNowPlaying(creds);
-  return cached(nowPlayingCache, force, NOWPLAYING_CACHE_MS, () => core.loadNowPlaying(creds, getServerId));
+  return cached(nowPlayingCache, force, NOWPLAYING_CACHE_MS, async () =>
+    core.loadNowPlaying({ ...creds, linkBase: await publicLinkBase(core.trimBase(creds.url)) }, getServerId)
+  );
 }
 
 // Lists Jellyfin accounts so the settings page can render a picker. Must
@@ -127,4 +152,67 @@ async function listUsers() {
   }
 }
 
-module.exports = { configured, getSessions, resumeList, nextUpList, nowPlaying, listUsers, invalidate };
+// --- image proxy -------------------------------------------------------------
+
+const IMAGE_TYPES = new Set(['Primary', 'Logo']);
+const IMAGE_ID_RE = /^(?:[0-9a-f]{32}|[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12})$/i;
+const IMAGE_MIN_WIDTH = 32;
+const IMAGE_MAX_WIDTH = 800;
+const IMAGE_DEFAULT_WIDTH = 200;
+const IMAGE_MAX_BYTES = 5 * 1024 * 1024;
+const IMAGE_TIMEOUT_MS = 8000;
+
+// One poster or logo from Jellyfin, for GET /api/jellyfin/image. The upstream
+// URL is built here from the configured Jellyfin URL; the request supplies
+// only an item id, an image type from a whitelist and a clamped width, so no
+// request-controlled URL or host ever reaches fetch. The API key goes in a
+// header, never a URL, and never appears in the result. Never throws.
+// Returns { status, contentType, body } on success, else { status, error }.
+async function image({ id, type, maxWidth }) {
+  if (!IMAGE_ID_RE.test(id || '')) return { status: 400, error: 'id must be a Jellyfin item id.' };
+  if (!IMAGE_TYPES.has(type)) return { status: 400, error: 'type must be Primary or Logo.' };
+  let width = IMAGE_DEFAULT_WIDTH;
+  if (maxWidth !== null && maxWidth !== undefined && maxWidth !== '') {
+    if (!/^\d{1,6}$/.test(maxWidth)) return { status: 400, error: 'maxWidth must be an integer.' };
+    width = Math.min(IMAGE_MAX_WIDTH, Math.max(IMAGE_MIN_WIDTH, Number(maxWidth)));
+  }
+
+  const s = await settings.load();
+  const urlBase = core.trimBase(s.jellyfin.url);
+  const apiKey = s.jellyfin.apiKey || '';
+  if (!urlBase || !apiKey) return { status: 404, error: 'Jellyfin is not configured.' };
+
+  try {
+    const res = await fetch(`${urlBase}/Items/${id}/Images/${type}?maxWidth=${width}`, {
+      headers: { Authorization: `MediaBrowser Token="${apiKey}"` },
+      redirect: 'manual', // a redirect could move the key to another host
+      signal: AbortSignal.timeout(IMAGE_TIMEOUT_MS),
+    });
+    if (res.status === 404) {
+      await res.body?.cancel();
+      return { status: 404, error: 'No such image.' };
+    }
+    const contentType = res.headers.get('content-type') || '';
+    if (!res.ok || !/^image\//i.test(contentType)) {
+      await res.body?.cancel();
+      return { status: 502, error: 'Jellyfin did not return an image.' };
+    }
+    const declared = Number(res.headers.get('content-length'));
+    if (declared > IMAGE_MAX_BYTES) {
+      await res.body?.cancel();
+      return { status: 502, error: 'Image is too large.' };
+    }
+    const chunks = [];
+    let size = 0;
+    for await (const chunk of res.body) {
+      size += chunk.length;
+      if (size > IMAGE_MAX_BYTES) return { status: 502, error: 'Image is too large.' };
+      chunks.push(chunk);
+    }
+    return { status: 200, contentType, body: Buffer.concat(chunks) };
+  } catch (e) {
+    return { status: 502, error: core.describeFetchFailure(e, urlBase).message };
+  }
+}
+
+module.exports = { configured, image, getSessions, resumeList, nextUpList, nowPlaying, listUsers, invalidate };

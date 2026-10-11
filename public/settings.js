@@ -44,11 +44,6 @@ function setField(name, value) {
   if (el) el.value = value != null ? value : '';
 }
 
-function setCheck(name, value) {
-  const el = document.querySelector(`[name="${name}"]`);
-  if (el) el.checked = value === true;
-}
-
 // Key fields are never populated with the actual value — the server never
 // sends one. The hint (last 4 chars, or null) is shown as a helper string
 // next to the field, and as a placeholder, so the field visibly reads
@@ -81,10 +76,8 @@ function populateForm() {
   applyKeyHint('pangolin.apiKey', 'hint-pangolin', pangolin.apiKeyHint);
 
   setField('truenas.url', truenas.url);
+  setField('truenas.certFingerprint', truenas.certFingerprint);
   applyKeyHint('truenas.apiKey', 'hint-truenas', truenas.apiKeyHint);
-
-  setCheck('truenas.fromBrowser', truenas.fromBrowser);
-  setCheck('jellyfin.fromBrowser', jellyfin.fromBrowser);
 
   setField('jellyfin.url', jellyfin.url);
   applyKeyHint('jellyfin.apiKey', 'hint-jellyfin', jellyfin.apiKeyHint);
@@ -130,6 +123,7 @@ async function loadJellyfinUsers() {
 
 async function testTarget(target, resultElId) {
   const el = $(`#${resultElId}`);
+  if (target === 'truenas') $('#trust-truenas-cert').hidden = true;
   el.hidden = false;
   el.classList.remove('test-ok', 'test-fail');
   el.textContent = 'Testing…';
@@ -142,10 +136,26 @@ async function testTarget(target, resultElId) {
     const body = await res.json();
     el.textContent = body.detail || (body.ok ? 'OK.' : 'No detail returned.');
     el.classList.add(body.ok ? 'test-ok' : 'test-fail');
+    if (target === 'truenas' && body.certFingerprint) offerCertTrust(el, body.certFingerprint);
   } catch (e) {
     el.textContent = 'Could not reach the server.';
     el.classList.add('test-fail');
   }
+}
+
+// The server returns the certificate fingerprint TrueNAS presented (public,
+// not a secret; the API key was NOT sent). Showing it lets the user compare
+// it with the one in TrueNAS before filling the field. They still press SAVE.
+function offerCertTrust(resultEl, fingerprint) {
+  resultEl.textContent += ` Fingerprint: ${fingerprint}`;
+  const btn = $('#trust-truenas-cert');
+  btn.hidden = false;
+  btn.onclick = () => {
+    setField('truenas.certFingerprint', fingerprint);
+    btn.hidden = true;
+    resultEl.textContent = 'Fingerprint filled in. Press SAVE, then TEST again.';
+    resultEl.classList.remove('test-fail');
+  };
 }
 
 // ---------------------------------------------------------------------------
@@ -177,12 +187,11 @@ function buildPayload(form) {
     },
     truenas: {
       url: get('truenas.url'),
-      fromBrowser: form.elements['truenas.fromBrowser'].checked,
+      certFingerprint: get('truenas.certFingerprint'),
     },
     jellyfin: {
       url: get('jellyfin.url'),
       userId: get('jellyfin.userId'),
-      fromBrowser: form.elements['jellyfin.fromBrowser'].checked,
     },
   };
 
@@ -230,6 +239,7 @@ async function boot() {
   $('#chip-theme').addEventListener('click', cycleTheme);
   $('#chip-theme').textContent = `THEME · ${(document.documentElement.getAttribute('data-theme') || 'ko').toUpperCase()}`;
   $('#test-pangolin').addEventListener('click', () => testTarget('pangolin', 'test-result-pangolin'));
+  $('#test-truenas').addEventListener('click', () => testTarget('truenas', 'test-result-truenas'));
   $('#settings-form').addEventListener('submit', handleSubmit);
 
   try {

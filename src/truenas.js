@@ -1,23 +1,21 @@
-// TrueNAS telemetry. Zero dependencies — uses the platform's global
-// WebSocket (Node 22+). Node < 22 has no global WebSocket, so this module
-// degrades to a clean error result instead of throwing; it must never crash
-// server boot or leave an unhandled rejection on an older runtime.
+// TrueNAS telemetry. Zero dependencies.
 //
 // TrueNAS 25.04+ speaks JSON-RPC 2.0 over a single WebSocket endpoint
 // (wss://<host>/api/current). REST v2.0 is deprecated there and removed in
-// TrueNAS 26, so WebSocket is the only route worth building.
+// TrueNAS 26, so WebSocket is the only route worth building. The socket is
+// our own TLS client (src/wsclient.js) rather than the global WebSocket so a
+// self-signed TrueNAS certificate can be pinned by fingerprint.
 //
 // Credentials are read from src/settings.js on every call — never cached at
 // module load — so a settings change takes effect on the next call.
 //
 // The RPC session, the call list and buildSnapshot (including the netdata
-// "available, not used" memory semantics) live in
-// public/shared/truenas-core.js so the browser can run the exact same code
-// when "Call from browser" is on. This file only adds settings lookup, the
-// Node-version guard and the cache.
+// "available, not used" memory semantics) live in src/truenas-core.js. This
+// file only adds settings lookup and the cache.
 
 const settings = require('./settings');
-const core = require('../public/shared/truenas-core');
+const core = require('./truenas-core');
+const { probeFingerprint } = require('./wsclient');
 
 const CACHE_MS = 15 * 1000;
 
@@ -30,13 +28,13 @@ function invalidate() {
   cache = { at: 0, data: null };
 }
 
-async function snapshot(force = false) {
-  if (typeof WebSocket === 'undefined') {
-    return core.emptyResult(`TrueNAS telemetry needs Node 22 or newer (this server is running ${process.version}).`);
-  }
+function credsFrom(s) {
+  return { url: s.truenas.url, apiKey: s.truenas.apiKey, certFingerprint: s.truenas.certFingerprint };
+}
 
+async function snapshot(force = false) {
   const s = await settings.load();
-  const creds = { url: s.truenas.url, apiKey: s.truenas.apiKey };
+  const creds = credsFrom(s);
   if (!(creds.url || '').trim() || !creds.apiKey) {
     return core.emptyResult('TrueNAS is not configured.');
   }
@@ -50,10 +48,31 @@ async function snapshot(force = false) {
 }
 
 // For the settings page's "test connection" button. Never throws; the
-// detail string never contains the API key.
+// detail string never contains the API key. When the certificate is not
+// trusted and no pin is set, it also returns the fingerprint the server
+// presented (public, not secret) so the page can offer "Trust this
+// certificate" — found by a separate probe that sends nothing, so the key
+// has not left this process.
 async function testConnection() {
-  const result = await snapshot(true);
-  if (!result.ok) return { ok: false, detail: result.error };
+  const s = await settings.load();
+  const creds = credsFrom(s);
+  if (!(creds.url || '').trim() || !creds.apiKey) return { ok: false, detail: 'TrueNAS is not configured.' };
+
+  let result;
+  try {
+    result = await core.runSnapshot(creds);
+    cache = { at: Date.now(), data: result };
+  } catch (e) {
+    const failure = { ok: false, detail: core.describeFailure(e) };
+    if (e && e.code === 'CERT_UNTRUSTED' && !creds.certFingerprint) {
+      const fingerprint = await probeFingerprint(creds.url.trim());
+      if (fingerprint) {
+        failure.certFingerprint = fingerprint;
+        failure.detail = 'The TrueNAS certificate is not trusted (a self-signed certificate is normal). Compare the fingerprint, then trust it.';
+      }
+    }
+    return failure;
+  }
   const poolCount = Array.isArray(result.pools) ? result.pools.length : 0;
   if (poolCount === 0) {
     return { ok: true, detail: `TrueNAS ${result.host.version || 'unknown version'}, no pools found` };

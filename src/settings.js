@@ -28,8 +28,8 @@ function defaultSettings() {
   return {
     version: VERSION,
     pangolin: { apiUrl: '', orgId: '', apiKey: '' },
-    jellyfin: { url: '', apiKey: '', userId: '', fromBrowser: false },
-    truenas: { url: '', apiKey: '', fromBrowser: false },
+    jellyfin: { url: '', apiKey: '', userId: '' },
+    truenas: { url: '', apiKey: '', certFingerprint: '' },
     branding: { model: 'PB-1', subtitle: 'サーバー' },
   };
 }
@@ -82,11 +82,35 @@ function validateApiKey(value, existing, label) {
   return value;
 }
 
-// Strict: "false" or 0 must not silently turn on a mode that hands the API
-// key to every browser. Only a real boolean passes.
-function validateBoolean(value, label) {
-  if (typeof value !== 'boolean') throw validationError(`${label} must be true or false.`);
-  return value;
+// TrueNAS 25.04+ revokes an API key the moment it is used over plain
+// http/ws, so an http:// URL here would destroy the key on first use.
+//
+// `fromDisk` skips the https rule: an older settings.json may still hold an
+// http:// URL, and a validation failure while loading would make load()
+// treat the file as corrupt and overwrite it. The rule applies to every save.
+function validateTruenasUrl(value, fromDisk) {
+  const url = validateUrlField(value, 'truenas.url');
+  if (!fromDisk && url && new URL(url).protocol === 'http:') {
+    throw validationError(
+      'truenas.url must use https://. TrueNAS 25.04 and newer revoke an API key that is used over plain HTTP.'
+    );
+  }
+  return url;
+}
+
+// SHA-256 fingerprint of the TrueNAS certificate, the format Node prints
+// for getPeerCertificate().fingerprint256: 32 hex pairs joined by colons.
+// Stored upper-case so comparisons never depend on how it was pasted.
+const FINGERPRINT_RE = /^([0-9A-F]{2}:){31}[0-9A-F]{2}$/;
+
+function validateCertFingerprint(value) {
+  if (typeof value !== 'string') throw validationError('truenas.certFingerprint must be a string.');
+  const trimmed = value.trim().toUpperCase();
+  if (trimmed === '') return '';
+  if (!FINGERPRINT_RE.test(trimmed)) {
+    throw validationError('truenas.certFingerprint must be a SHA-256 fingerprint: 32 hex pairs separated by colons.');
+  }
+  return trimmed;
 }
 
 function validateJellyfinUserId(value) {
@@ -117,7 +141,7 @@ function validateSubtitle(value) {
 
 // Merges `patch` on top of `current`, validating every field. Unknown
 // top-level keys are ignored, not an error.
-function mergeAndValidate(current, patch) {
+function mergeAndValidate(current, patch, fromDisk = false) {
   const next = defaultSettings();
   next.version = VERSION;
 
@@ -135,17 +159,12 @@ function mergeAndValidate(current, patch) {
   next.jellyfin.userId = validateJellyfinUserId(
     j.userId !== undefined ? j.userId : current.jellyfin.userId
   );
-  next.jellyfin.fromBrowser = validateBoolean(
-    j.fromBrowser !== undefined ? j.fromBrowser : current.jellyfin.fromBrowser,
-    'jellyfin.fromBrowser'
-  );
 
   const t = (patch && typeof patch === 'object' && patch.truenas) || {};
-  next.truenas.url = validateUrlField(t.url !== undefined ? t.url : current.truenas.url, 'truenas.url');
+  next.truenas.url = validateTruenasUrl(t.url !== undefined ? t.url : current.truenas.url, fromDisk);
   next.truenas.apiKey = validateApiKey(t.apiKey, current.truenas.apiKey, 'truenas.apiKey');
-  next.truenas.fromBrowser = validateBoolean(
-    t.fromBrowser !== undefined ? t.fromBrowser : current.truenas.fromBrowser,
-    'truenas.fromBrowser'
+  next.truenas.certFingerprint = validateCertFingerprint(
+    t.certFingerprint !== undefined ? t.certFingerprint : current.truenas.certFingerprint
   );
 
   const b = (patch && typeof patch === 'object' && patch.branding) || {};
@@ -170,7 +189,7 @@ async function readFromDisk() {
   const parsed = JSON.parse(raw);
   // Merge onto defaults so a settings.json from an older/partial version
   // never leaves a field undefined.
-  return mergeAndValidate(defaultSettings(), parsed);
+  return mergeAndValidate(defaultSettings(), parsed, true);
 }
 
 async function writeToDisk(settings) {
@@ -245,12 +264,11 @@ function toPublicView(settings) {
       url: settings.jellyfin.url,
       apiKeyHint: hintFor(settings.jellyfin.apiKey),
       userId: settings.jellyfin.userId,
-      fromBrowser: settings.jellyfin.fromBrowser,
     },
     truenas: {
       url: settings.truenas.url,
       apiKeyHint: hintFor(settings.truenas.apiKey),
-      fromBrowser: settings.truenas.fromBrowser,
+      certFingerprint: settings.truenas.certFingerprint,
     },
     branding: {
       model: settings.branding.model,
@@ -274,21 +292,6 @@ async function configured() {
   return isConfigured(settings);
 }
 
-// The ONE place a raw key may leave the server for a browser: only for
-// services whose "Call from browser" flag is on. Everything else stays
-// server-side. Returns {} when no service opted in.
-async function browserCredentials() {
-  const s = await load();
-  const out = {};
-  if (s.jellyfin.fromBrowser) {
-    out.jellyfin = { url: s.jellyfin.url, apiKey: s.jellyfin.apiKey, userId: s.jellyfin.userId };
-  }
-  if (s.truenas.fromBrowser) {
-    out.truenas = { url: s.truenas.url, apiKey: s.truenas.apiKey };
-  }
-  return out;
-}
-
 module.exports = {
   DATA_DIR,
   SETTINGS_FILE,
@@ -296,5 +299,4 @@ module.exports = {
   save,
   publicView,
   configured,
-  browserCredentials,
 };
