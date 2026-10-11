@@ -22,6 +22,7 @@ const MIME = {
   '.svg': 'image/svg+xml',
   '.ico': 'image/x-icon',
   '.json': 'application/json; charset=utf-8',
+  '.webmanifest': 'application/manifest+json; charset=utf-8',
   '.woff2': 'font/woff2',
   '.png': 'image/png',
   '.webp': 'image/webp',
@@ -32,13 +33,8 @@ const MIME = {
 // Extensions worth gzipping when the client sends Accept-Encoding: gzip.
 // Never the woff2 font — it's already compressed, and re-compressing it
 // only burns CPU for zero (or negative) size benefit.
-const COMPRESSIBLE_EXT = new Set(['.js', '.css', '.html', '.json', '.svg']);
+const COMPRESSIBLE_EXT = new Set(['.js', '.css', '.html', '.json', '.svg', '.webmanifest']);
 
-// The one accent colour that's constant across both colourways (--sub /
-// --alert / --signal in ko; --sub / --alert in riddim) — read from
-// public/styles.css by hand, not guessed. Used only for the inline
-// favicon below; see handleFavicon.
-const ACCENT = '#F04E23';
 
 // --- helpers -----------------------------------------------------------
 
@@ -208,21 +204,17 @@ async function serveStatic(req, res, urlPath) {
   res.end(data);
 }
 
-// Small inline mark, monochrome-in-spirit (dark plate + the app's one
-// constant accent), legible at 16px. Never a file under public/ — this
-// route is the only place that may live in src/server.js.
+// Browsers that ask for /favicon.ico without reading the <link> tags get
+// the same small panel mark as public/icons/favicon.svg.
+const FAVICON_SVG = require('node:fs').readFileSync(path.join(PUBLIC_DIR, 'icons', 'favicon.svg'));
+
 function handleFavicon(req, res) {
-  const svg =
-    '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 32 32">' +
-    '<rect width="32" height="32" rx="7" fill="#1C1C1C"/>' +
-    `<circle cx="16" cy="16" r="7" fill="${ACCENT}"/>` +
-    '</svg>';
   res.writeHead(200, {
     'Content-Type': 'image/svg+xml',
     'Cache-Control': 'public, max-age=604800',
-    'Content-Length': Buffer.byteLength(svg),
+    'Content-Length': FAVICON_SVG.length,
   });
-  res.end(svg);
+  res.end(FAVICON_SVG);
 }
 
 // --- route handlers --------------------------------------------------------

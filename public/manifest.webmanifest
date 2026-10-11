@@ -1,0 +1,27 @@
+{
+  "name": "Patchbay",
+  "short_name": "Patchbay",
+  "description": "PB-1 start page for a Pangolin-fronted homelab.",
+  "start_url": "/",
+  "scope": "/",
+  "display": "standalone",
+  "background_color": "#B4B4AF",
+  "theme_color": "#1C1C1C",
+  "icons": [
+    {
+      "src": "/icons/icon-192.png",
+      "sizes": "192x192",
+      "type": "image/png"
+    },
+    {
+      "src": "/icons/icon-512.png",
+      "sizes": "512x512",
+      "type": "image/png"
+    },
+    {
+      "src": "/icons/mark.svg",
+      "sizes": "any",
+      "type": "image/svg+xml"
+    }
+  ]
+}

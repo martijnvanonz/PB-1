@@ -178,6 +178,19 @@ button.chip { cursor: pointer; }
   flex-wrap: wrap;
 }
 
+.plate-id {
+  display: flex;
+  align-items: center;
+  gap: 11px;
+}
+
+/* The panel mark (public/icons/mark.svg), inline so it takes the theme. */
+.plate-mark { width: 38px; height: 38px; flex: none; display: block; }
+.plate-mark .pm-bg, .plate-mark .pm-hole { fill: var(--plate-fg); }
+.plate-mark .pm-jack { fill: var(--plate-bg); }
+.plate-mark .pm-cable { fill: none; stroke: var(--sub); stroke-width: 5; stroke-linecap: round; }
+.plate-mark .pm-plug { fill: var(--sub); }
+
 .plate-model {
   font-family: "Helvetica Neue", Helvetica, Arial, sans-serif;
   font-size: 23px;
