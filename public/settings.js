@@ -191,9 +191,12 @@ function buildPayload(form) {
     },
     jellyfin: {
       url: get('jellyfin.url'),
-      userId: get('jellyfin.userId'),
     },
   };
+
+  // A disabled user select (the list could not load) is left out of
+  // FormData; sending '' would wipe the saved user. Omit it to keep it.
+  if (!$('#jellyfin-user-select').disabled) payload.jellyfin.userId = get('jellyfin.userId');
 
   // Blank key field = keep the existing key. Only send apiKey when the
   // user actually typed something into it.
