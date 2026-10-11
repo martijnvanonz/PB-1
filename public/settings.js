@@ -153,7 +153,7 @@ function offerCertTrust(resultEl, fingerprint) {
   btn.onclick = () => {
     setField('truenas.certFingerprint', fingerprint);
     btn.hidden = true;
-    resultEl.textContent = 'Fingerprint filled in. Press SAVE, then TEST again.';
+    resultEl.textContent = 'Fingerprint filled in. Enter the API key again (a new fingerprint needs it), press SAVE, then TEST again.';
     resultEl.classList.remove('test-fail');
   };
 }
