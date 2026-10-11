@@ -157,7 +157,8 @@ function effectivePort(u) {
 // `internalUrl` (e.g. the Jellyfin URL the server calls), or null. Uses the
 // same internal address candidateBaseUrls builds, so the INTERNAL_HOST
 // loopback substitution applies here too. Resources without a public URL
-// are skipped: they cannot serve as a browser-reachable address.
+// and disabled resources are skipped: they cannot serve as a browser-reachable
+// address (an old, disabled resource may still target the same port).
 function findPublicResource(internalUrl, resources) {
   let target;
   try {
@@ -166,7 +167,7 @@ function findPublicResource(internalUrl, resources) {
     return null;
   }
   for (const resource of Array.isArray(resources) ? resources : []) {
-    if (!resource.url || !resource.destination || !resource.destinationPort) continue;
+    if (resource.enabled === false || !resource.url || !resource.destination || !resource.destinationPort) continue;
     let internal;
     try {
       internal = new URL(candidateBaseUrls(resource)[0]);
