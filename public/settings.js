@@ -232,7 +232,28 @@ async function handleSubmit(e) {
 // Boot
 // ---------------------------------------------------------------------------
 
+// Per-device choice, kept in localStorage and applied at once. It is not part
+// of the server payload. app.js reads the same key.
+const CASSETTE_LINK_KEY = 'patchbay.cassetteLink';
+
+function initCassetteLink() {
+  const select = $('#cassette-link');
+  let saved = 'web';
+  try {
+    const v = localStorage.getItem(CASSETTE_LINK_KEY);
+    if (v === 'streamyfin' || v === 'swiftfin') saved = v;
+  } catch (e) { /* localStorage unavailable */ }
+  select.value = saved;
+  select.addEventListener('change', () => {
+    try {
+      localStorage.setItem(CASSETTE_LINK_KEY, select.value);
+      $('#cassette-link-saved').hidden = false;
+    } catch (e) { /* localStorage unavailable */ }
+  });
+}
+
 async function boot() {
+  initCassetteLink();
   $('#chip-back').addEventListener('click', () => {
     window.location.href = '/index.html';
   });

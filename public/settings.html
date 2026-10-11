@@ -146,6 +146,24 @@
       </div>
     </section>
 
+    <section class="settings-section">
+      <div class="section-head">
+        <span class="lbl">THIS DEVICE</span>
+        <span class="section-note">SAVED ONLY IN THIS BROWSER</span>
+      </div>
+      <div class="settings-grid">
+        <label class="settings-field">CASSETTE CLICK OPENS
+          <select id="cassette-link">
+            <option value="web">Jellyfin web</option>
+            <option value="streamyfin">Streamyfin app</option>
+            <option value="swiftfin">Swiftfin app</option>
+          </select>
+          <span class="field-help">Saved only in this browser, not on the server. The app must be installed on this device. Swiftfin needs the same Jellyfin user signed in.</span>
+          <span class="field-help" id="cassette-link-saved" hidden>Saved for this device.</span>
+        </label>
+      </div>
+    </section>
+
     <div class="modal-error" id="form-error" hidden></div>
 
     <div class="edit-actions">

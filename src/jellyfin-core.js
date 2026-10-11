@@ -196,6 +196,7 @@ function formatJellyfinItem(it, linkBase, serverId, withProgress, livePositionTi
 
   return {
     id: it.Id,
+    serverId,
     title,
     subtitle,
     series: title,

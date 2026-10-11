@@ -1247,16 +1247,48 @@ function tapeInnerHtml(d) {
   `;
 }
 
+// What a cassette click opens is a per-device choice kept in localStorage
+// (set on the settings page): the Jellyfin web link, or a deep link into the
+// Streamyfin or Swiftfin app. A missing id falls back to the web link.
+const CASSETTE_LINK_KEY = 'patchbay.cassetteLink';
+
+function cassetteLinkMode() {
+  try {
+    const v = localStorage.getItem(CASSETTE_LINK_KEY);
+    return v === 'streamyfin' || v === 'swiftfin' ? v : 'web';
+  } catch (e) {
+    return 'web'; // localStorage unavailable
+  }
+}
+
+function cassetteHref(d, mode) {
+  const userId = (STATE && STATE.settings && STATE.settings.jellyfin && STATE.settings.jellyfin.userId) || '';
+  if (mode === 'streamyfin' && d.id) {
+    return `streamyfin://items/page?id=${encodeURIComponent(d.id)}`;
+  }
+  if (mode === 'swiftfin' && d.id && d.serverId && userId) {
+    return `swiftfin://${encodeURIComponent(d.serverId)}/${encodeURIComponent(userId)}/item/${encodeURIComponent(d.id)}`;
+  }
+  return d.url;
+}
+
 // Patches one cassette in place: attributes on the <a> itself (href, the
 // per-item --hue/--hue-fg the server already computed, aria-label) plus a
 // fresh innerHTML for everything inside it. The <a> node's identity never
 // changes across a refresh — see reconcileSlider — so this never disturbs
 // the slider's scroll position or mid-drag state.
 function updateTapeEl(el, d) {
-  if (d.url) {
-    el.href = d.url;
-    el.target = '_blank';
-    el.rel = 'noopener';
+  const href = cassetteHref(d, cassetteLinkMode());
+  if (href) {
+    el.href = href;
+    if (href === d.url) {
+      el.target = '_blank';
+      el.rel = 'noopener';
+    } else {
+      // custom schemes navigate in place
+      el.removeAttribute('target');
+      el.removeAttribute('rel');
+    }
   } else {
     el.removeAttribute('href');
   }

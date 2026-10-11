@@ -338,6 +338,14 @@ To update after a new push to `main`, use **Update** on the app (or
 stop and start it with "pull image" checked) so TrueNAS fetches the new
 `:latest`.
 
+### Opening cassettes in an app
+
+On the settings page, under **THIS DEVICE**, choose what a click on a
+Jellyfin cassette opens: Jellyfin web (default), the Streamyfin app, or
+the Swiftfin app. The choice is saved in that browser only, so each
+phone or computer can differ. The app must be installed on the device,
+and Swiftfin needs the same Jellyfin user signed in.
+
 ### Pointing Patchbay at Jellyfin and TrueNAS
 
 The server, not your browser, calls Jellyfin and TrueNAS. A container
