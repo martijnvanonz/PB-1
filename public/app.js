@@ -312,6 +312,32 @@ async function pingTwiceAveraged(url) {
   return { up: true, ms: Math.round(avg) };
 }
 
+// Fallback probe for services whose "/" answers with a redirect to http://
+// (an app behind a TLS-terminating proxy that does not know it): on an
+// HTTPS page the browser blocks that redirect as mixed content, so the
+// ping fails although the service is up. The icon the server discovered
+// for the tile is a plain static file on the same host — no redirect — so
+// a successful fetch of it proves the same route answers. Only same-origin
+// icons count; one lookup per target per page load (the server caches it).
+const ICON_PROBE = {};
+
+function iconProbeUrl(url, key) {
+  if (!(url in ICON_PROBE)) {
+    ICON_PROBE[url] = fetch(`/api/icon?key=${encodeURIComponent(key)}`)
+      .then((r) => r.json())
+      .then((data) => (data.url && new URL(data.url).origin === new URL(url).origin ? data.url : null))
+      .catch(() => null);
+  }
+  return ICON_PROBE[url];
+}
+
+async function pingTarget(url, key) {
+  const result = await pingTwiceAveraged(url);
+  if (result.up || !key) return result;
+  const iconUrl = await iconProbeUrl(url, key);
+  return iconUrl ? pingTwiceAveraged(iconUrl) : result;
+}
+
 async function runWithConcurrency(items, limit, worker) {
   const queue = items.slice();
   const runnerCount = Math.min(limit, queue.length);
@@ -338,12 +364,14 @@ async function checkAllUptime() {
 
   const entries = buildSearchIndex(); // placed + tray, deduped
   const targets = [];
+  const iconKeys = {}; // target url -> Pangolin key, for the icon fallback
   const seen = new Set();
   for (const entry of entries) {
     const url = targetUrlFor(entry);
     if (!url || isMixedContent(url) || seen.has(url)) continue;
     seen.add(url);
     targets.push(url);
+    if (entry.kind === 'pangolin' && entry.hideKey) iconKeys[url] = entry.hideKey;
   }
 
   await runWithConcurrency(targets, CHECK_CONCURRENCY, async (url) => {
@@ -351,7 +379,7 @@ async function checkAllUptime() {
     updateStatusForUrl(url); // bars start their sweep — targeted, no rebuild
     renderScreen(); // small fixed region, cheap to keep the count/P95 live
     renderChips(); // ditto for the N DOWN count
-    CLIENT_HEALTH[url] = await pingTwiceAveraged(url);
+    CLIENT_HEALTH[url] = await pingTarget(url, iconKeys[url]);
     CHECKING_NOW.delete(url);
     updateStatusForUrl(url); // ...and settle back to flat when the result lands
     renderScreen();
